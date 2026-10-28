@@ -572,7 +572,7 @@ let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0, lastSpeechEndWall=0;
 const ENDTURN_MS = 600;   // extra silence after a phrase before we treat the turn as finished (snappy but tolerates short pauses)
 const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
 const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
-const pLat=document.getElementById('pLat'), pPlayer=document.getElementById('pPlayer');
+const pPlayer=document.getElementById('pPlayer');
 
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 pBtn.onclick = () => { on ? hardStop() : start(); };
@@ -596,7 +596,7 @@ function scheduleEndTurn(){ clearTimeout(endTurnTimer); endTurnTimer=setTimeout(
 async function start() {
   convo=[]; curLine=''; interimActive=false; turnBuf=''; replying=false;
   audioEpoch=0; uAudioStart=0; uFirst=null; uTTFP=null; uAudioEnd=null;
-  pReply.innerHTML='<span class="meta">…</span>'; pLat.innerHTML=''; pPlayer.style.display='none';
+  pReply.innerHTML='<span class="meta">…</span>'; pPlayer.style.display='none';
   pOut.innerHTML='<span class="meta">connecting…</span>';
   let key;
   try { const kr=await fetch('/api/rtkey'); const kj=await kr.json(); if(!kj.ok) throw new Error(kj.error||'no key'); key=kj.key; }
