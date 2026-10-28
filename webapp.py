@@ -594,7 +594,9 @@ pBtn.onclick = () => { on ? hardStop() : start(); };
 
 function latTag(l){
   if(!l) return '';
-  return ' <span style="color:var(--muted);font-size:12px">· reply '+l.total+'ms (LLM '+l.llm+'ms · TTS '+l.tts+'ms)</span>';
+  const a = (l.ttft!=null?'LLM TTFT '+l.ttft+'ms':'LLM TTFT —');
+  const b = (l.ttfa!=null?'TTS TTFA '+l.ttfa+'ms':'TTS TTFA —');
+  return ' <span style="color:var(--muted);font-size:12px">· '+a+' · '+b+'</span>';
 }
 function render() {
   const log = convo.map(o => o.role==='you'
@@ -673,37 +675,33 @@ async function finalizeTurn() {
       body:JSON.stringify({text, history}), signal:AbortSignal.timeout(20000)});
     const j=await r.json();
     if(!j.ok){ logLine('LLM ERROR: '+(j.error||('HTTP '+r.status))); pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
-    const llmDone=performance.now();
-    logLine('LLM reply received (server LLM '+(j.timings&&j.timings.llm_ms!=null?j.timings.llm_ms:'?')+' ms): "'+j.reply+'"');
+    const ttft=(j.timings&&j.timings.llm_ttft_ms!=null)?j.timings.llm_ttft_ms:null;   // LLM Time To First Token
+    logLine('LLM reply received (TTFT '+(ttft!=null?ttft+' ms':'?')+'): "'+j.reply+'"');
 
-    // 2) STREAM the audio — playback starts at first sound (low perceived latency).
-    const voice=document.getElementById('pVoice').value;
-    const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
-
-    // show the reply text immediately; latency fills in when first sound plays
-    const llm=(j.timings&&j.timings.llm_ms!=null)?j.timings.llm_ms:null;
+    // show the reply text immediately; latency fills in after TTS
     const entry={role:'atlas', text:j.reply, lat:null};
     convo.push(entry); render();
-    pReply.innerHTML='<span class="meta">Latency (time to first sound) shows next to each reply above.</span>';
+    pReply.innerHTML='<span class="meta">Per reply: LLM TTFT (first token) + TTS TTFA (first audio).</span>';
 
+    // 2) TTS — fetch audio, read Atlas TTFA header, then play (reliable, no stall).
+    const voice=document.getElementById('pVoice').value;
+    const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
     logLine('TTS request sent');
-    pPlayer.src=url; pPlayer.style.display='block';
-    let shown=false;
-    pPlayer.onplaying = () => {                 // first sound heard
-      if(shown) return; shown=true;
-      const tts=Math.round(performance.now()-llmDone);        // LLM done -> first sound
-      const total=Math.round(performance.now()-tStart);       // turn captured -> first sound
-      entry.lat={total, llm:(llm!=null?llm:Math.max(0,total-tts)), tts}; render();
-      logLine('FIRST SOUND 🔊 (TTS '+tts+' ms, total '+total+' ms)');
-    };
+    const ar=await fetch(url, {signal:AbortSignal.timeout(25000)});
+    if(!ar.ok){ const ej=await ar.json().catch(()=>({})); logLine('TTS ERROR: '+(ej.error||('HTTP '+ar.status))); pReply.innerHTML='<span class="err">TTS error: '+esc(ej.error||('HTTP '+ar.status))+'</span>'; resumeListening(); return; }
+    const ttfaHdr=ar.headers.get('X-Atlas-First-Audio-Ms');
+    const ttfa=ttfaHdr!=null?parseInt(ttfaHdr,10):null;                 // Atlas Time To First Audio
+    const blob=await ar.blob();
+    entry.lat={ttft, ttfa}; render();
+    logLine('TTS audio ready (TTFA '+(ttfa!=null?ttfa+' ms':'?')+')');
+
+    pPlayer.src=URL.createObjectURL(blob); pPlayer.style.display='block';
     pPlayer.onended = () => { logLine('audio finished'); resumeListening(); };
-    pPlayer.onerror = () => { if(!shown) pReply.innerHTML='<span class="err">Audio playback error — try again.</span>'; resumeListening(); };
-    // watchdog: if nothing plays/ends within 30s, recover so it never sticks on "thinking"
+    pPlayer.onerror = () => { resumeListening(); };
     const wd=setTimeout(()=>{ if(replying){ resumeListening(); } }, 30000);
-    const clearWd=()=>clearTimeout(wd);
-    pPlayer.addEventListener('ended', clearWd, {once:true});
-    pPlayer.addEventListener('error', clearWd, {once:true});
-    pPlayer.play().catch(()=>{ clearWd(); resumeListening(); });
+    pPlayer.addEventListener('ended', ()=>clearTimeout(wd), {once:true});
+    pPlayer.addEventListener('error', ()=>clearTimeout(wd), {once:true});
+    pPlayer.play().catch(()=>{ clearTimeout(wd); resumeListening(); });
   } catch(e){
     const msg = (e && (e.name==='TimeoutError'||e.name==='AbortError')) ? 'Timed out — Atlas was slow. Please try again.' : (e && e.message) || 'error';
     pReply.innerHTML='<span class="err">'+esc(msg)+'</span>'; resumeListening();
@@ -924,10 +922,11 @@ def api_respond():
                        error=chat.get("error") or "LLM returned no text"), 502
     import datetime as _dt
     iso = lambda t: _dt.datetime.utcfromtimestamp(t).strftime("%H:%M:%S.%f")[:-3] + "Z"
-    g._detail = (f"RESPOND ok reply={len(reply)}c llm={chat.get('elapsed_ms')}ms "
-                 f"llm_start={iso(llm_started)} llm_end={iso(llm_ended)}")
+    g._detail = (f"RESPOND ok reply={len(reply)}c ttft={chat.get('ttft_ms')}ms "
+                 f"llm={chat.get('elapsed_ms')}ms llm_start={iso(llm_started)} llm_end={iso(llm_ended)}")
     return jsonify(ok=True, reply=reply, model=LLM_MODEL,
-                   timings={"llm_ms": chat.get("elapsed_ms"),
+                   timings={"llm_ttft_ms": chat.get("ttft_ms"),
+                            "llm_ms": chat.get("elapsed_ms"),
                             "llm_started": iso(llm_started), "llm_ended": iso(llm_ended)})
 
 
@@ -975,18 +974,16 @@ def api_speak_stream():
         g._detail = f"SPEAK_STREAM fail status={last}"
         return jsonify(ok=False, error=f"atlas-speak returned {last}",
                        detail="Atlas was temporarily unavailable; please try again."), 502
-    g._detail = f"SPEAK_STREAM stream voice={voice} fmt={fmt} chars={len(text)}"
-
-    def generate():
-        try:
-            for chunk in upstream.iter_content(chunk_size=4096):
-                if chunk:
-                    yield chunk
-        finally:
-            upstream.close()
-    resp = Response(generate(), mimetype=mime)
+    # Atlas's own Time To First Audio (TTFA) — the market-standard TTS metric.
+    ttfa = upstream.headers.get("X-Atlas-First-Audio-Ms")
+    audio = upstream.content
+    upstream.close()
+    g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)} ttfa={ttfa}ms bytes={len(audio)}"
+    resp = Response(audio, mimetype=mime)
     resp.headers["Cache-Control"] = "no-store"
-    resp.headers["X-Accel-Buffering"] = "no"
+    if ttfa is not None:
+        resp.headers["X-Atlas-First-Audio-Ms"] = str(ttfa)
+        resp.headers["Access-Control-Expose-Headers"] = "X-Atlas-First-Audio-Ms"
     return resp
 
 

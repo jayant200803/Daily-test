@@ -6,6 +6,7 @@ golden rule governs the Atlas calls, not this third-party LLM.
 """
 import os
 import time
+import json
 import requests
 
 from config import LLM_BASE_URL, LLM_MODEL, LLM_KEY_ENV
@@ -40,24 +41,39 @@ def chat(user_text=None, system=None, model=None, history=None):
         # gpt-oss on Groq is a reasoning model; keep reasoning minimal so the
         # spoken reply comes back fast and 'content' isn't eaten by reasoning tokens.
         "reasoning_effort": "low",
+        "stream": True,          # stream so we can measure Time To First Token (TTFT)
     }
     t0 = time.time()
+    ttft_ms = None
+    parts = []
     try:
-        r = requests.post(
+        with requests.post(
             f"{LLM_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {key.strip()}", "Content-Type": "application/json"},
-            json=body,
-            timeout=60,
-        )
+            json=body, stream=True, timeout=(5, 60),
+        ) as r:
+            if r.status_code != 200:
+                try:
+                    err = (r.json().get("error", {}) or {}).get("message")
+                except Exception:
+                    err = r.text[:200]
+                return {"status": r.status_code, "error": err or f"HTTP {r.status_code}"}
+            for line in r.iter_lines():
+                if not line or not line.startswith(b"data: "):
+                    continue
+                data = line[6:]
+                if data == b"[DONE]":
+                    break
+                try:
+                    delta = json.loads(data)["choices"][0].get("delta", {})
+                except Exception:
+                    continue
+                piece = delta.get("content")
+                if piece:
+                    if ttft_ms is None:          # first content token -> TTFT
+                        ttft_ms = int((time.time() - t0) * 1000)
+                    parts.append(piece)
     except requests.RequestException as e:
         return {"status": None, "error": f"request failed: {e}"}
-    out = {"status": r.status_code, "elapsed_ms": int((time.time() - t0) * 1000)}
-    try:
-        j = r.json()
-        if r.ok:
-            out["text"] = (j["choices"][0]["message"].get("content") or "").strip()
-        else:
-            out["error"] = (j.get("error", {}) or {}).get("message") or str(j)[:200]
-    except Exception:
-        out["error"] = r.text[:300]
-    return out
+    return {"status": 200, "elapsed_ms": int((time.time() - t0) * 1000),
+            "ttft_ms": ttft_ms, "text": "".join(parts).strip()}
