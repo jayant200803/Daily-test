@@ -119,6 +119,9 @@ PAGE = """<!doctype html>
     <label>Vocabulary hint (optional, comma-separated words)</label>
     <input type="text" id="livePrompt" placeholder="e.g. OneInbox, Exotel, NS1156">
     <div class="result" id="liveOut" style="min-height:60px"><span class="meta">Live transcript will stream here.</span></div>
+    <div class="meta" id="liveSummary" style="margin-top:10px"></div>
+    <p class="meta" style="margin:8px 0 0; font-size:11px">Latency (market-standard, measured client-side over the real network):
+      <b>TTFP</b> time to first partial · <b>Lag</b> transcript latency vs audio · <b>EOT</b> end-of-speech &rarr; final. Summary shows p50/p95.</p>
   </div>
 
   <div class="card">
@@ -262,34 +265,70 @@ speakBtn.onclick = async () => {
 // acceptable only for a TEST key. Everything here is additive to the batch STT above.
 let liveWS = null, liveCtx = null, liveStream = null, liveProc = null, liveSrc = null, liveOn = false;
 let committedLines = [], currentLine = "", interimActive = false;
-let utterStart = 0, firstWordMs = null;   // latency: start of utterance -> first word
+
+// ---- Latency metrics (market-standard, client-side over the real network) ----
+// audioEpoch: wall-clock (performance.now) at audio position 0, so audio ms X => audioEpoch + X.
+let audioEpoch = 0;
+// per-utterance timing
+let uAudioStart = 0, uFirstPartial = null, uStoppedRecv = null, uAudioEnd = null, uTTFP = null;
+// session samples for percentiles
+let mTTFP = [], mLAG = [], mEOT = [];
+
 const liveBtn = document.getElementById('liveBtn');
 const liveStatus = document.getElementById('liveStatus');
 const liveOut = document.getElementById('liveOut');
+const liveSummary = document.getElementById('liveSummary');
 
 liveBtn.onclick = () => { liveOn ? stopLive() : startLive(); };
 
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
 function renderLive() {
-  // each finalized utterance (a phrase between pauses) on its own line, with its latency
-  const lines = committedLines.map(o =>
-    '<div><span style="color:var(--fg)">'+escapeHtml(o.text)+'</span>'
-    + (o.ms!=null ? ' <span style="color:var(--muted);font-size:12px">· first word '+o.ms+'ms</span>' : '')
-    + '</div>').join('');
-  // the line currently being spoken, dim, with a live latency tag once the first word lands
-  const curTag = (firstWordMs!=null && currentLine) ? ' <span style="color:var(--muted);font-size:12px">· '+firstWordMs+'ms</span>' : '';
+  // each finalized utterance (a phrase between pauses) on its own line, with its 3 latencies
+  const lines = committedLines.map(o => {
+    const tags = [];
+    if (o.ttfp != null) tags.push('ttfp '+o.ttfp+'ms');
+    if (o.lag  != null) tags.push('lag '+o.lag+'ms');
+    if (o.eot  != null) tags.push('eot '+o.eot+'ms');
+    const tag = tags.length ? ' <span style="color:var(--muted);font-size:12px">· '+tags.join(' · ')+'</span>' : '';
+    return '<div><span style="color:var(--fg)">'+escapeHtml(o.text)+'</span>'+tag+'</div>';
+  }).join('');
+  const curTag = (uTTFP != null && currentLine) ? ' <span style="color:var(--muted);font-size:12px">· ttfp '+uTTFP+'ms</span>' : '';
   const cur = currentLine ? '<div><span style="color:var(--muted)">'+escapeHtml(currentLine)+'</span>'+curTag+'</div>' : '';
   liveOut.innerHTML = (lines || cur) ? (lines + cur) : '<span class="meta">Listening…</span>';
 }
-function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
-function markFirstWord(txt){
-  if (firstWordMs === null && txt && txt.trim()) {
-    firstWordMs = Math.round(performance.now() - utterStart);
-    liveStatus.innerHTML = '<span class="dot"></span>live · first word '+firstWordMs+'ms';
+
+function pct(arr, p) {
+  if (!arr.length) return null;
+  const s = [...arr].sort((a,b)=>a-b);
+  const i = Math.min(s.length-1, Math.max(0, Math.ceil(p/100*s.length)-1));
+  return s[i];
+}
+function fmtMetric(name, arr) {
+  if (!arr.length) return name+': —';
+  return name+': p50 '+pct(arr,50)+'ms · p95 '+pct(arr,95)+'ms (n='+arr.length+')';
+}
+function renderSummary() {
+  if (!mTTFP.length && !mLAG.length && !mEOT.length) { liveSummary.innerHTML = ''; return; }
+  liveSummary.innerHTML = '<b>Session latency</b> &nbsp; '
+    + fmtMetric('TTFP', mTTFP) + ' &nbsp;|&nbsp; '
+    + fmtMetric('Lag', mLAG)   + ' &nbsp;|&nbsp; '
+    + fmtMetric('EOT', mEOT);
+}
+
+function markFirstPartial(txt){
+  if (uFirstPartial === null && txt && txt.trim()) {
+    uFirstPartial = performance.now();
+    // TTFP vs when speech began in the audio timeline
+    uTTFP = Math.max(0, Math.round(uFirstPartial - (audioEpoch + uAudioStart)));
+    liveStatus.innerHTML = '<span class="dot"></span>live · ttfp '+uTTFP+'ms';
   }
 }
 
 async function startLive() {
-  committedLines = []; currentLine = ""; interimActive = false; utterStart = 0; firstWordMs = null;
+  committedLines = []; currentLine = ""; interimActive = false;
+  audioEpoch = 0; uAudioStart = 0; uFirstPartial = null; uTTFP = null; uStoppedRecv = null; uAudioEnd = null;
+  mTTFP = []; mLAG = []; mEOT = []; liveSummary.innerHTML = '';
   liveOut.innerHTML = '<span class="meta">connecting…</span>';
   // 1) get the key from our server (test key; see note above)
   let key;
@@ -337,6 +376,7 @@ async function startLive() {
       liveWS.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64(i16.buffer) }));
     };
     liveSrc.connect(liveProc); liveProc.connect(liveCtx.destination);
+    audioEpoch = performance.now();   // audio position 0 starts now (anchor for latency)
     liveOn = true;
     liveBtn.textContent = 'Stop live'; liveBtn.classList.add('rec');
     liveStatus.innerHTML = '<span class="dot"></span>live';
@@ -347,19 +387,33 @@ async function startLive() {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     switch (m.type) {
       case 'input_audio_buffer.speech_started':
-        utterStart = performance.now(); firstWordMs = null;
+        uAudioStart = (m.audio_start_ms != null) ? m.audio_start_ms : Math.round(performance.now() - audioEpoch);
+        uFirstPartial = null; uTTFP = null; uStoppedRecv = null; uAudioEnd = null;
         currentLine = ''; interimActive = false; renderLive(); break;
       case 'conversation.item.input_audio_transcription.interim':
-        if (utterStart === 0) utterStart = performance.now();
-        interimActive = true; markFirstWord(m.text); currentLine = m.text || ''; renderLive(); break;
+        interimActive = true; markFirstPartial(m.text); currentLine = m.text || ''; renderLive(); break;
       case 'conversation.item.input_audio_transcription.delta':
-        if (utterStart === 0) utterStart = performance.now();
-        markFirstWord(m.delta);
+        markFirstPartial(m.delta);
         if (!interimActive) { currentLine += (m.delta || ''); renderLive(); } break;
-      case 'conversation.item.input_audio_transcription.completed':
-        if (m.transcript) committedLines.push({ text: m.transcript, ms: firstWordMs });
-        currentLine = ''; interimActive = false; utterStart = 0; firstWordMs = null;
-        renderLive(); break;
+      case 'input_audio_buffer.speech_stopped':
+        uStoppedRecv = performance.now();
+        uAudioEnd = (m.audio_end_ms != null) ? m.audio_end_ms : Math.round(uStoppedRecv - audioEpoch);
+        break;
+      case 'conversation.item.input_audio_transcription.completed': {
+        const now = performance.now();
+        // Metric 1 — transcript latency (lag): how far behind the audio the final landed
+        const lag = (uAudioEnd != null) ? Math.max(0, Math.round(now - (audioEpoch + uAudioEnd))) : null;
+        // Metric 2 — EOT latency: end-of-speech event -> final transcript
+        const eot = (uStoppedRecv != null) ? Math.max(0, Math.round(now - uStoppedRecv)) : null;
+        // Metric 3 — TTFP already computed as uTTFP
+        if (uTTFP != null) mTTFP.push(uTTFP);
+        if (lag   != null) mLAG.push(lag);
+        if (eot   != null) mEOT.push(eot);
+        if (m.transcript) committedLines.push({ text: m.transcript, ttfp: uTTFP, lag: lag, eot: eot });
+        currentLine = ''; interimActive = false;
+        uFirstPartial = null; uTTFP = null; uStoppedRecv = null; uAudioEnd = null;
+        renderLive(); renderSummary(); break;
+      }
       case 'error':
         liveStatus.textContent = '';
         liveOut.innerHTML = '<span class="err">Atlas error: '+((m.error&&(m.error.message||m.error.code))||'unknown')+'</span>';
