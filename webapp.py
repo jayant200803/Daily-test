@@ -657,24 +657,32 @@ async function finalizeTurn() {
     if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
     const llmDone=performance.now();
 
-    // 2) fetch the (short) mp3 fully, THEN play — 25s safety timeout so it can never hang.
+    // 2) STREAM the audio — playback starts at first sound (low perceived latency).
     const voice=document.getElementById('pVoice').value;
     const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
-    const ar=await fetch(url, {signal:AbortSignal.timeout(25000)});
-    if(!ar.ok){ const ej=await ar.json().catch(()=>({})); pReply.innerHTML='<span class="err">TTS error: '+esc(ej.error||('HTTP '+ar.status))+'</span>'; resumeListening(); return; }
-    const blob=await ar.blob();
-    pPlayer.src=URL.createObjectURL(blob); pPlayer.style.display='block';
 
-    // per-reply latency (reliable wall-clock): total = turn captured -> reply ready
-    const total=Math.round(performance.now()-tStart);
-    const tts=Math.round(performance.now()-llmDone);
-    const llm=(j.timings&&j.timings.llm_ms!=null)?j.timings.llm_ms:Math.max(0,total-tts);
-    convo.push({role:'atlas', text:j.reply, lat:{total, llm, tts}}); render();
-    pReply.innerHTML='<span class="meta">Latency is shown next to each reply above.</span>';
+    // show the reply text immediately; latency fills in when first sound plays
+    const llm=(j.timings&&j.timings.llm_ms!=null)?j.timings.llm_ms:null;
+    const entry={role:'atlas', text:j.reply, lat:null};
+    convo.push(entry); render();
+    pReply.innerHTML='<span class="meta">Latency (time to first sound) shows next to each reply above.</span>';
 
+    pPlayer.src=url; pPlayer.style.display='block';
+    let shown=false;
+    pPlayer.onplaying = () => {                 // first sound heard
+      if(shown) return; shown=true;
+      const tts=Math.round(performance.now()-llmDone);        // LLM done -> first sound
+      const total=Math.round(performance.now()-tStart);       // turn captured -> first sound
+      entry.lat={total, llm:(llm!=null?llm:Math.max(0,total-tts)), tts}; render();
+    };
     pPlayer.onended = () => resumeListening();
-    pPlayer.onerror = () => resumeListening();
-    pPlayer.play().catch(()=>{ resumeListening(); });
+    pPlayer.onerror = () => { if(!shown) pReply.innerHTML='<span class="err">Audio playback error — try again.</span>'; resumeListening(); };
+    // watchdog: if nothing plays/ends within 30s, recover so it never sticks on "thinking"
+    const wd=setTimeout(()=>{ if(replying){ resumeListening(); } }, 30000);
+    const clearWd=()=>clearTimeout(wd);
+    pPlayer.addEventListener('ended', clearWd, {once:true});
+    pPlayer.addEventListener('error', clearWd, {once:true});
+    pPlayer.play().catch(()=>{ clearWd(); resumeListening(); });
   } catch(e){
     const msg = (e && (e.name==='TimeoutError'||e.name==='AbortError')) ? 'Timed out — Atlas was slow. Please try again.' : (e && e.message) || 'error';
     pReply.innerHTML='<span class="err">'+esc(msg)+'</span>'; resumeListening();
@@ -919,31 +927,39 @@ def api_speak_stream():
     fmt = (request.args.get("format") or "mp3").strip()
     mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "opus": "audio/ogg", "pcm": "audio/basic"}.get(fmt, "audio/mpeg")
 
-    # Buffer the full (short) mp3 server-side and return a bounded response. More
-    # reliable than chunked streaming (clean Content-Length, no client-side hang).
+    # Stream chunks to the browser as Atlas produces them, so playback can start at
+    # first audio (low perceived latency). Retry transient errors on the initial call.
+    upstream = None
     last = None
-    audio = None
     for attempt in range(3):
         try:
-            r = atlas.speak_stream(text, voice=voice, response_format=fmt)
+            upstream = atlas.speak_stream(text, voice=voice, response_format=fmt)
         except Exception as e:
             last = f"exc:{e}"; time.sleep(0.4 * (attempt + 1)); continue
-        if r.status_code == 200:
-            audio = r.content          # read fully, then upstream closes
+        if upstream.status_code == 200:
             break
-        last = r.status_code
-        r.close()
-        if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
-            time.sleep(0.5 * (attempt + 1))   # brief backoff, then retry
+        last = upstream.status_code
+        upstream.close()
+        if upstream.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+            time.sleep(0.5 * (attempt + 1))
             continue
         break
-    if not audio:
+    if upstream is None or upstream.status_code != 200:
         g._detail = f"SPEAK_STREAM fail status={last}"
         return jsonify(ok=False, error=f"atlas-speak returned {last}",
                        detail="Atlas was temporarily unavailable; please try again."), 502
-    g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)} bytes={len(audio)}"
-    resp = Response(audio, mimetype=mime)
+    g._detail = f"SPEAK_STREAM stream voice={voice} fmt={fmt} chars={len(text)}"
+
+    def generate():
+        try:
+            for chunk in upstream.iter_content(chunk_size=4096):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+    resp = Response(generate(), mimetype=mime)
     resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
 
