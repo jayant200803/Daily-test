@@ -261,7 +261,8 @@ speakBtn.onclick = async () => {
 // Per the Atlas docs this browser form exposes the key to anyone who opens the page;
 // acceptable only for a TEST key. Everything here is additive to the batch STT above.
 let liveWS = null, liveCtx = null, liveStream = null, liveProc = null, liveSrc = null, liveOn = false;
-let committedText = "", currentLine = "", interimActive = false;
+let committedLines = [], currentLine = "", interimActive = false;
+let utterStart = 0, firstWordMs = null;   // latency: start of utterance -> first word
 const liveBtn = document.getElementById('liveBtn');
 const liveStatus = document.getElementById('liveStatus');
 const liveOut = document.getElementById('liveOut');
@@ -269,14 +270,26 @@ const liveOut = document.getElementById('liveOut');
 liveBtn.onclick = () => { liveOn ? stopLive() : startLive(); };
 
 function renderLive() {
-  const solid = committedText ? '<span style="color:var(--fg)">'+escapeHtml(committedText)+'</span>' : '';
-  const dim = currentLine ? '<span style="color:var(--muted)"> '+escapeHtml(currentLine)+'</span>' : '';
-  liveOut.innerHTML = (solid || dim) ? (solid + dim) : '<span class="meta">Listening…</span>';
+  // each finalized utterance (a phrase between pauses) on its own line, with its latency
+  const lines = committedLines.map(o =>
+    '<div><span style="color:var(--fg)">'+escapeHtml(o.text)+'</span>'
+    + (o.ms!=null ? ' <span style="color:var(--muted);font-size:12px">· first word '+o.ms+'ms</span>' : '')
+    + '</div>').join('');
+  // the line currently being spoken, dim, with a live latency tag once the first word lands
+  const curTag = (firstWordMs!=null && currentLine) ? ' <span style="color:var(--muted);font-size:12px">· '+firstWordMs+'ms</span>' : '';
+  const cur = currentLine ? '<div><span style="color:var(--muted)">'+escapeHtml(currentLine)+'</span>'+curTag+'</div>' : '';
+  liveOut.innerHTML = (lines || cur) ? (lines + cur) : '<span class="meta">Listening…</span>';
 }
 function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function markFirstWord(txt){
+  if (firstWordMs === null && txt && txt.trim()) {
+    firstWordMs = Math.round(performance.now() - utterStart);
+    liveStatus.innerHTML = '<span class="dot"></span>live · first word '+firstWordMs+'ms';
+  }
+}
 
 async function startLive() {
-  committedText = ""; currentLine = ""; interimActive = false;
+  committedLines = []; currentLine = ""; interimActive = false; utterStart = 0; firstWordMs = null;
   liveOut.innerHTML = '<span class="meta">connecting…</span>';
   // 1) get the key from our server (test key; see note above)
   let key;
@@ -333,13 +346,20 @@ async function startLive() {
   liveWS.onmessage = ev => {
     let m; try { m = JSON.parse(ev.data); } catch { return; }
     switch (m.type) {
+      case 'input_audio_buffer.speech_started':
+        utterStart = performance.now(); firstWordMs = null;
+        currentLine = ''; interimActive = false; renderLive(); break;
       case 'conversation.item.input_audio_transcription.interim':
-        interimActive = true; currentLine = m.text || ''; renderLive(); break;
+        if (utterStart === 0) utterStart = performance.now();
+        interimActive = true; markFirstWord(m.text); currentLine = m.text || ''; renderLive(); break;
       case 'conversation.item.input_audio_transcription.delta':
+        if (utterStart === 0) utterStart = performance.now();
+        markFirstWord(m.delta);
         if (!interimActive) { currentLine += (m.delta || ''); renderLive(); } break;
       case 'conversation.item.input_audio_transcription.completed':
-        if (m.transcript) committedText += (committedText ? ' ' : '') + m.transcript;
-        currentLine = ''; interimActive = false; renderLive(); break;
+        if (m.transcript) committedLines.push({ text: m.transcript, ms: firstWordMs });
+        currentLine = ''; interimActive = false; utterStart = 0; firstWordMs = null;
+        renderLive(); break;
       case 'error':
         liveStatus.textContent = '';
         liveOut.innerHTML = '<span class="err">Atlas error: '+((m.error&&(m.error.message||m.error.code))||'unknown')+'</span>';
