@@ -562,17 +562,32 @@ PIPELINE_PAGE = """<!doctype html>
     <audio id="pPlayer" controls style="width:100%; display:none; margin-bottom:10px"></audio>
     <div class="result" id="pReply"><span class="meta">Each reply shows its latency inline above (reply = LLM + TTS).</span></div>
   </div>
+
+  <div class="card">
+    <h2>⏱️ Latency log (step by step)</h2>
+    <p class="meta" style="margin:0 0 10px">Every stage with its wall-clock time and ms since the turn started — like backend logs.</p>
+    <pre id="pLog" style="margin:0; padding:12px; background:#0d1117; border:1px solid var(--border); border-radius:8px; font:12px/1.5 ui-monospace,Consolas,monospace; color:var(--fg); max-height:260px; overflow:auto; white-space:pre-wrap"></pre>
+  </div>
 </div>
 
 <script>
 let ws=null, ctx=null, stream=null, proc=null, src=null, on=false, replying=false;
 let audioEpoch=0, curLine='', interimActive=false;
 let uAudioStart=0, uFirst=null, uTTFP=null, uAudioEnd=null;
-let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0, lastSpeechEndWall=0;
+let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0, lastSpeechEndWall=0, tStart=0;
 const ENDTURN_MS = 600;   // extra silence after a phrase before we treat the turn as finished (snappy but tolerates short pauses)
 const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
 const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
 const pPlayer=document.getElementById('pPlayer');
+const pLog=document.getElementById('pLog');
+function logLine(label){
+  const now=new Date();
+  const hh=now.toTimeString().slice(0,8);
+  const mmm=String(now.getMilliseconds()).padStart(3,'0');
+  const dt=Math.round(performance.now()-tStart);
+  pLog.textContent += '['+hh+'.'+mmm+']  +'+String(dt).padStart(5,' ')+' ms  '+label+'\\n';
+  pLog.scrollTop=pLog.scrollHeight;
+}
 
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 pBtn.onclick = () => { on ? hardStop() : start(); };
@@ -644,18 +659,22 @@ async function finalizeTurn() {
   const text = turnBuf.trim(); turnBuf='';
   if(!text || replying || !on) return;
   replying=true;                         // stop listening while we reply (prevents echo)
-  const tStart=performance.now();        // reliable wall-clock: turn captured -> reply ready
+  tStart=performance.now();              // reliable wall-clock: turn captured -> reply ready
   convo.push({role:'you', text}); render();
+  logLine('── TURN ── you: "'+text+'"');
+  logLine('turn captured (you stopped speaking)');
   pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
     // full conversation (incl. this turn) so the model remembers context
     const history = convo.map(o => ({ role: o.role==='atlas' ? 'assistant' : 'user', content: o.text }));
     // 1) LLM only (fast) — 20s safety timeout
+    logLine('LLM request sent');
     const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({text, history}), signal:AbortSignal.timeout(20000)});
     const j=await r.json();
-    if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
+    if(!j.ok){ logLine('LLM ERROR: '+(j.error||('HTTP '+r.status))); pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
     const llmDone=performance.now();
+    logLine('LLM reply received (server LLM '+(j.timings&&j.timings.llm_ms!=null?j.timings.llm_ms:'?')+' ms): "'+j.reply+'"');
 
     // 2) STREAM the audio — playback starts at first sound (low perceived latency).
     const voice=document.getElementById('pVoice').value;
@@ -667,6 +686,7 @@ async function finalizeTurn() {
     convo.push(entry); render();
     pReply.innerHTML='<span class="meta">Latency (time to first sound) shows next to each reply above.</span>';
 
+    logLine('TTS request sent');
     pPlayer.src=url; pPlayer.style.display='block';
     let shown=false;
     pPlayer.onplaying = () => {                 // first sound heard
@@ -674,8 +694,9 @@ async function finalizeTurn() {
       const tts=Math.round(performance.now()-llmDone);        // LLM done -> first sound
       const total=Math.round(performance.now()-tStart);       // turn captured -> first sound
       entry.lat={total, llm:(llm!=null?llm:Math.max(0,total-tts)), tts}; render();
+      logLine('FIRST SOUND 🔊 (TTS '+tts+' ms, total '+total+' ms)');
     };
-    pPlayer.onended = () => resumeListening();
+    pPlayer.onended = () => { logLine('audio finished'); resumeListening(); };
     pPlayer.onerror = () => { if(!shown) pReply.innerHTML='<span class="err">Audio playback error — try again.</span>'; resumeListening(); };
     // watchdog: if nothing plays/ends within 30s, recover so it never sticks on "thinking"
     const wd=setTimeout(()=>{ if(replying){ resumeListening(); } }, 30000);
