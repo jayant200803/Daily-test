@@ -108,6 +108,20 @@ PAGE = """<!doctype html>
   </div>
 
   <div class="card">
+    <h2>🔴 Live transcription (streaming) &rarr; atlas-listen</h2>
+    <p class="meta" style="margin:0 0 12px">Words appear <b>while you speak</b> over a WebSocket. Interim words show dim; finalized text turns solid.</p>
+    <div class="row">
+      <button id="liveBtn">Start live</button>
+      <span id="liveStatus" class="meta"></span>
+    </div>
+    <label>Language</label>
+    <select id="liveLang"><option value="en" selected>en (English)</option><option value="ja">ja (Japanese)</option></select>
+    <label>Vocabulary hint (optional, comma-separated words)</label>
+    <input type="text" id="livePrompt" placeholder="e.g. OneInbox, Exotel, NS1156">
+    <div class="result" id="liveOut" style="min-height:60px"><span class="meta">Live transcript will stream here.</span></div>
+  </div>
+
+  <div class="card">
     <h2>⌨️ Type &rarr; atlas-speak (TTS)</h2>
     <label>Text to speak</label>
     <textarea id="ttsText">Thank you for calling. How may I help you with your booking today?</textarea>
@@ -241,6 +255,118 @@ speakBtn.onclick = async () => {
     ttsOut.innerHTML = '<span class="err">'+e.message+'</span>';
   } finally { speakBtn.disabled = false; }
 };
+
+// ---------- LIVE streaming STT over WebSocket (browser -> Atlas directly) ----------
+// NOTE: the Atlas key is fetched from /api/rtkey and used in the WS subprotocol.
+// Per the Atlas docs this browser form exposes the key to anyone who opens the page;
+// acceptable only for a TEST key. Everything here is additive to the batch STT above.
+let liveWS = null, liveCtx = null, liveStream = null, liveProc = null, liveSrc = null, liveOn = false;
+let committedText = "", currentLine = "", interimActive = false;
+const liveBtn = document.getElementById('liveBtn');
+const liveStatus = document.getElementById('liveStatus');
+const liveOut = document.getElementById('liveOut');
+
+liveBtn.onclick = () => { liveOn ? stopLive() : startLive(); };
+
+function renderLive() {
+  const solid = committedText ? '<span style="color:var(--fg)">'+escapeHtml(committedText)+'</span>' : '';
+  const dim = currentLine ? '<span style="color:var(--muted)"> '+escapeHtml(currentLine)+'</span>' : '';
+  liveOut.innerHTML = (solid || dim) ? (solid + dim) : '<span class="meta">Listening…</span>';
+}
+function escapeHtml(s){ return s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+async function startLive() {
+  committedText = ""; currentLine = ""; interimActive = false;
+  liveOut.innerHTML = '<span class="meta">connecting…</span>';
+  // 1) get the key from our server (test key; see note above)
+  let key;
+  try {
+    const kr = await fetch('/api/rtkey'); const kj = await kr.json();
+    if (!kj.ok) throw new Error(kj.error || 'no key'); key = kj.key;
+  } catch (e) { liveOut.innerHTML = '<span class="err">Cannot get key: '+e.message+'</span>'; return; }
+
+  // 2) mic at 16 kHz (a rate Atlas accepts: 8/16/24/48 kHz)
+  try {
+    liveStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    liveCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  } catch (e) { liveOut.innerHTML = '<span class="err">Microphone blocked: '+e.message+'</span>'; return; }
+  const rate = liveCtx.sampleRate;   // may be 16000 (or the nearest the browser allows)
+
+  // 3) open the WebSocket straight to Atlas, authed via subprotocol
+  liveWS = new WebSocket('wss://atlas.oneinbox.ai/v1/realtime?intent=transcription',
+                         ['realtime', 'openai-insecure-api-key.' + key]);
+
+  liveWS.onopen = () => {
+    liveWS.send(JSON.stringify({
+      type: 'session.update',
+      session: {
+        type: 'transcription',
+        audio: { input: {
+          format: { type: 'audio/pcm', rate: rate },
+          transcription: {
+            model: 'atlas-listen',
+            language: document.getElementById('liveLang').value,
+            prompt: document.getElementById('livePrompt').value || undefined
+          },
+          turn_detection: { type: 'server_vad', silence_duration_ms: 500 }
+        }},
+        atlas: { interim: true }
+      }
+    }));
+    // start streaming mic once the socket is open
+    liveSrc = liveCtx.createMediaStreamSource(liveStream);
+    liveProc = liveCtx.createScriptProcessor(4096, 1, 1);
+    liveProc.onaudioprocess = e => {
+      if (!liveOn || liveWS.readyState !== 1) return;
+      const f32 = e.inputBuffer.getChannelData(0);
+      const i16 = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++) { let s = Math.max(-1, Math.min(1, f32[i])); i16[i] = s < 0 ? s*0x8000 : s*0x7FFF; }
+      liveWS.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: b64(i16.buffer) }));
+    };
+    liveSrc.connect(liveProc); liveProc.connect(liveCtx.destination);
+    liveOn = true;
+    liveBtn.textContent = 'Stop live'; liveBtn.classList.add('rec');
+    liveStatus.innerHTML = '<span class="dot"></span>live';
+    renderLive();
+  };
+
+  liveWS.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch { return; }
+    switch (m.type) {
+      case 'conversation.item.input_audio_transcription.interim':
+        interimActive = true; currentLine = m.text || ''; renderLive(); break;
+      case 'conversation.item.input_audio_transcription.delta':
+        if (!interimActive) { currentLine += (m.delta || ''); renderLive(); } break;
+      case 'conversation.item.input_audio_transcription.completed':
+        if (m.transcript) committedText += (committedText ? ' ' : '') + m.transcript;
+        currentLine = ''; interimActive = false; renderLive(); break;
+      case 'error':
+        liveStatus.textContent = '';
+        liveOut.innerHTML = '<span class="err">Atlas error: '+((m.error&&(m.error.message||m.error.code))||'unknown')+'</span>';
+        stopLive(); break;
+    }
+  };
+  liveWS.onerror = () => { liveStatus.textContent=''; if(liveOn) liveOut.innerHTML = '<span class="err">WebSocket error (check key / network)</span>'; };
+  liveWS.onclose = () => { if (liveOn) stopLive(); };
+}
+
+function stopLive() {
+  liveOn = false;
+  try { if (liveProc) liveProc.disconnect(); } catch {}
+  try { if (liveSrc) liveSrc.disconnect(); } catch {}
+  try { if (liveStream) liveStream.getTracks().forEach(t => t.stop()); } catch {}
+  try { if (liveCtx) liveCtx.close(); } catch {}
+  try { if (liveWS && liveWS.readyState === 1) liveWS.close(); } catch {}
+  liveBtn.textContent = 'Start live'; liveBtn.classList.remove('rec');
+  liveStatus.textContent = '';
+}
+
+// base64-encode an ArrayBuffer of 16-bit PCM
+function b64(buf) {
+  const bytes = new Uint8Array(buf); let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
 </script>
 </body>
 </html>"""
@@ -266,6 +392,18 @@ def _json_errors(e):
 @app.get("/")
 def index():
     return render_template_string(PAGE.replace("__VOICE__", SPEAK_VOICE))
+
+
+@app.get("/api/rtkey")
+def api_rtkey():
+    """Hand the Atlas key to the browser for the direct-to-Atlas streaming WebSocket.
+    WARNING: this exposes the key to anyone who opens the page. Intended for a TEST
+    key only (the team chose browser-direct streaming over a server-side proxy)."""
+    key = os.environ.get("ATLAS_API_KEY")
+    if not key:
+        return jsonify(ok=False, error="ATLAS_API_KEY not set on server"), 500
+    g._detail = "RTKEY issued (browser streaming)"
+    return jsonify(ok=True, key=key.strip())
 
 
 @app.get("/api/health")
