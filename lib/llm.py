@@ -33,7 +33,10 @@ def chat(user_text=None, system=None, model=None, history=None):
         "model": model or LLM_MODEL,
         "messages": messages,
         "temperature": 0.4,
-        "max_tokens": 70,   # hard brevity cap -> short audio -> low TTS latency
+        # Enough room for this reasoning model to think AND emit the reply (too low
+        # starves 'content' -> empty text). Reply length is controlled by the prompt,
+        # not this cap, so a larger value does NOT make the spoken reply longer.
+        "max_tokens": 256,
         # gpt-oss on Groq is a reasoning model; keep reasoning minimal so the
         # spoken reply comes back fast and 'content' isn't eaten by reasoning tokens.
         "reasoning_effort": "low",
