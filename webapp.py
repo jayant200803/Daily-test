@@ -10,8 +10,8 @@ Endpoints hit Atlas exactly per the docs, via lib/atlas.py:
 Run:   python webapp.py
 Then open http://127.0.0.1:5000  (or the LAN address it prints) in a browser.
 """
-import os, tempfile
-from flask import Flask, request, jsonify, send_file, Response, render_template_string
+import os, tempfile, time, logging
+from flask import Flask, request, jsonify, send_file, Response, render_template_string, g
 
 try:
     from dotenv import load_dotenv
@@ -23,6 +23,35 @@ from config import SPEAK_VOICE
 from lib import atlas
 
 app = Flask(__name__)
+
+# ---- Per-request logging (prints one line per request; shows in Vercel > Logs) ----
+# Additive only: wrapped in try/except so logging can never break a request.
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+_log = logging.getLogger("atlas-web")
+
+
+def _client_ip():
+    # Behind Vercel the real client IP is in X-Forwarded-For (first entry).
+    xff = request.headers.get("X-Forwarded-For", "")
+    return xff.split(",")[0].strip() if xff else (request.remote_addr or "-")
+
+
+@app.before_request
+def _start_timer():
+    g._t0 = time.time()
+    g._detail = ""          # handlers may fill this with STT/TTS specifics
+
+
+@app.after_request
+def _log_request(resp):
+    try:
+        ms = int((time.time() - getattr(g, "_t0", time.time())) * 1000)
+        detail = getattr(g, "_detail", "") or ""
+        _log.info("REQ %s %s -> %s %dms ip=%s %s",
+                  request.method, request.path, resp.status_code, ms, _client_ip(), detail)
+    except Exception:
+        pass        # never let logging interfere with the response
+    return resp
 
 PAGE = """<!doctype html>
 <html lang="en">
@@ -265,8 +294,12 @@ def api_stt():
     try:
         f.save(tmp.name)
         tmp.close()
+        size = os.path.getsize(tmp.name) if os.path.exists(tmp.name) else 0
         res = atlas.transcribe(tmp.name, language=language, prompt=prompt, content_type="audio/wav")
         ok = res.get("status") == 200 and "text" in res
+        g._detail = ("STT lang=%s prompt=%r in=%dB atlas=%s %s"
+                     % (language, prompt or "", size, res.get("status"),
+                        "ok" if ok else ("err:" + str(res.get("raw"))[:80])))
         return jsonify(ok=ok, status=res.get("status"), text=res.get("text"),
                        elapsed_ms=res.get("elapsed_ms"), detail=res.get("raw"))
     finally:
@@ -289,9 +322,13 @@ def api_tts():
     res = atlas.synthesize(text, voice=voice, out_path=tmp.name, response_format="wav")
     if res.get("status") != 200 or not res.get("bytes"):
         detail = res.get("raw") or res.get("error")
+        g._detail = ("TTS voice=%s chars=%d atlas=%s err:%s"
+                     % (voice, len(text), res.get("status"), str(detail)[:80]))
         try: os.unlink(tmp.name)
         except OSError: pass
         return jsonify(ok=False, error=f"atlas-speak returned {res.get('status')}", detail=detail), 502
+    g._detail = ("TTS voice=%s chars=%d out=%dB first_audio=%sms"
+                 % (voice, len(text), res.get("bytes", 0), res.get("first_audio_header_ms")))
     resp = send_file(tmp.name, mimetype="audio/wav", as_attachment=False, download_name="speech.wav")
     if res.get("first_audio_header_ms"):
         resp.headers["X-Atlas-First-Audio-Ms"] = str(res["first_audio_header_ms"])
