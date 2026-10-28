@@ -841,7 +841,7 @@ def api_talk():
                            heard=heard), 502
 
         # 3) TTS
-        tts = atlas.synthesize(reply, voice=voice, out_path=tmp_out.name, response_format="wav")
+        tts = atlas.synthesize(_clean_tts_text(reply), voice=voice, out_path=tmp_out.name, response_format="wav")
         if tts.get("status") != 200 or not tts.get("bytes"):
             g._detail = f"TALK tts_fail status={tts.get('status')}"
             return jsonify(ok=False, stage="tts", status=tts.get("status"),
@@ -893,24 +893,45 @@ def api_respond():
                    timings={"llm_ms": chat.get("elapsed_ms")})
 
 
+def _clean_tts_text(s):
+    """Normalize LLM punctuation that can trip up TTS (smart quotes, dashes, ellipsis)."""
+    repl = {"’": "'", "‘": "'", "“": '"', "”": '"',
+            "‑": "-", "–": "-", "—": "-", "…": "...", " ": " "}
+    for a, b in repl.items():
+        s = s.replace(a, b)
+    return s
+
+
 @app.get("/api/speak_stream")
 def api_speak_stream():
     """Stream atlas-speak audio straight to the browser so playback starts at first
-    audio (low latency). mp3 by default (small, progressive-play friendly)."""
+    audio (low latency). mp3 by default. Retries transient Atlas errors (429/5xx)."""
     missing = _key_missing()
     if missing:
         return missing
-    text = (request.args.get("text") or "").strip()
+    text = _clean_tts_text((request.args.get("text") or "").strip())
     if not text:
         return jsonify(ok=False, error="no text"), 400
     voice = (request.args.get("voice") or SPEAK_VOICE).strip()
     fmt = (request.args.get("format") or "mp3").strip()
     mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "opus": "audio/ogg", "pcm": "audio/basic"}.get(fmt, "audio/mpeg")
-    upstream = atlas.speak_stream(text, voice=voice, response_format=fmt)
-    if upstream.status_code != 200:
-        body = upstream.text[:200]
-        g._detail = f"SPEAK_STREAM fail status={upstream.status_code}"
-        return jsonify(ok=False, error=f"atlas-speak returned {upstream.status_code}", detail=body), 502
+
+    upstream = None
+    last = None
+    for attempt in range(3):
+        upstream = atlas.speak_stream(text, voice=voice, response_format=fmt)
+        if upstream.status_code == 200:
+            break
+        last = upstream.status_code
+        upstream.close()
+        if upstream.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+            time.sleep(0.5 * (attempt + 1))   # brief backoff, then retry
+            continue
+        break
+    if upstream is None or upstream.status_code != 200:
+        g._detail = f"SPEAK_STREAM fail status={last}"
+        return jsonify(ok=False, error=f"atlas-speak returned {last}",
+                       detail="Atlas was temporarily unavailable; please try again."), 502
     g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)}"
 
     def generate():
