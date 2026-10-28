@@ -645,21 +645,31 @@ async function finalizeTurn() {
   convo.push({role:'you', text}); render();
   pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
+    // 1) LLM only (fast)
     const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text, voice:document.getElementById('pVoice').value})});
+      body:JSON.stringify({text})});
     const j=await r.json();
     if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
-    const bytes=atob(j.audio_b64); const a=new Uint8Array(bytes.length); for(let i=0;i<bytes.length;i++)a[i]=bytes.charCodeAt(i);
-    pPlayer.src=URL.createObjectURL(new Blob([a],{type:'audio/wav'})); pPlayer.style.display='block';
-    const e2e=Math.round(performance.now()-tTurnEnd);   // voice-to-voice: you stop -> reply starts
+    const llmDone=performance.now();
     convo.push({role:'atlas', text:j.reply}); render();
+
+    // 2) stream TTS — playback starts at first audio (no waiting for the whole clip)
+    const voice=document.getElementById('pVoice').value;
+    const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
+    pPlayer.src=url; pPlayer.style.display='block';
     const t=j.timings||{};
-    pReply.innerHTML='<div class="meta">Last reply latency:</div>';
-    pLat.innerHTML = chip(e2e,'End-to-end','you stop → reply')
-      + chip(t.llm_ms,'LLM', esc(j.model||''))
-      + chip(t.tts_first_audio_ms,'TTS first audio','atlas-speak');
+    let shown=false;
+    pPlayer.onplaying = () => {
+      if(shown) return; shown=true;
+      const e2e=Math.round(performance.now()-tTurnEnd);              // you stop -> first sound
+      const ttfa=Math.round(performance.now()-llmDone);              // LLM done -> first sound
+      pReply.innerHTML='<div class="meta">Last reply latency (time to first sound):</div>';
+      pLat.innerHTML = chip(e2e,'End-to-end','you stop → first sound')
+        + chip(t.llm_ms,'LLM', esc(j.model||''))
+        + chip(ttfa,'TTS → first sound','atlas-speak stream');
+    };
     pPlayer.onended = () => resumeListening();
-    pPlayer.play();
+    pPlayer.play().catch(()=>{ /* autoplay guard */ resumeListening(); });
   } catch(e){ pReply.innerHTML='<span class="err">'+esc(e.message)+'</span>'; resumeListening(); }
 }
 
@@ -853,45 +863,54 @@ def api_talk():
 
 @app.post("/api/respond")
 def api_respond():
-    """LLM + TTS from already-transcribed text (used by the /pipeline page, which
-    gets the transcript live over the streaming WebSocket, so STT is already done)."""
+    """LLM-ONLY from already-transcribed text (used by the /pipeline page). TTS is
+    fetched separately via /api/speak_stream so audio playback can start at first
+    audio instead of waiting for the whole clip."""
     if not os.environ.get(LLM_KEY_ENV):
         return jsonify(ok=False, stage="llm", error=f"{LLM_KEY_ENV} is not set on the server."), 500
-    missing = _key_missing()
-    if missing:
-        return missing
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
     if not text:
         return jsonify(ok=False, error="no text"), 400
-    voice = (data.get("voice") or SPEAK_VOICE).strip()
-
     chat = llm.chat(text, system=ASSISTANT_SYSTEM)
     reply = (chat.get("text") or "").strip()
     if chat.get("status") != 200 or not reply:
         g._detail = f"RESPOND llm_fail status={chat.get('status')}"
         return jsonify(ok=False, stage="llm", status=chat.get("status"),
                        error=chat.get("error") or "LLM returned no text"), 502
+    g._detail = f"RESPOND ok reply={len(reply)}c llm={chat.get('elapsed_ms')}ms"
+    return jsonify(ok=True, reply=reply, model=LLM_MODEL,
+                   timings={"llm_ms": chat.get("elapsed_ms")})
 
-    tmp_out = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    tmp_out.close()
-    try:
-        tts = atlas.synthesize(reply, voice=voice, out_path=tmp_out.name, response_format="wav")
-        if tts.get("status") != 200 or not tts.get("bytes"):
-            g._detail = f"RESPOND tts_fail status={tts.get('status')}"
-            return jsonify(ok=False, stage="tts", status=tts.get("status"),
-                           error=f"atlas-speak returned {tts.get('status')}", reply=reply), 502
-        with open(tmp_out.name, "rb") as fh:
-            audio_b64 = base64.b64encode(fh.read()).decode("ascii")
-        g._detail = (f"RESPOND ok reply={len(reply)}c llm={chat.get('elapsed_ms')}ms "
-                     f"tts_first={tts.get('first_audio_header_ms')}ms voice={voice}")
-        return jsonify(ok=True, reply=reply, audio_b64=audio_b64, model=LLM_MODEL, voice=voice,
-                       timings={"llm_ms": chat.get("elapsed_ms"),
-                                "tts_first_audio_ms": tts.get("first_audio_header_ms"),
-                                "tts_total_ms": tts.get("total_ms")})
-    finally:
-        try: os.unlink(tmp_out.name)
-        except OSError: pass
+
+@app.get("/api/speak_stream")
+def api_speak_stream():
+    """Stream atlas-speak audio straight to the browser so playback starts at first
+    audio (low latency). mp3 by default (small, progressive-play friendly)."""
+    missing = _key_missing()
+    if missing:
+        return missing
+    text = (request.args.get("text") or "").strip()
+    if not text:
+        return jsonify(ok=False, error="no text"), 400
+    voice = (request.args.get("voice") or SPEAK_VOICE).strip()
+    fmt = (request.args.get("format") or "mp3").strip()
+    mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "opus": "audio/ogg", "pcm": "audio/basic"}.get(fmt, "audio/mpeg")
+    upstream = atlas.speak_stream(text, voice=voice, response_format=fmt)
+    if upstream.status_code != 200:
+        body = upstream.text[:200]
+        g._detail = f"SPEAK_STREAM fail status={upstream.status_code}"
+        return jsonify(ok=False, error=f"atlas-speak returned {upstream.status_code}", detail=body), 502
+    g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)}"
+
+    def generate():
+        for chunk in upstream.iter_content(chunk_size=2048):
+            if chunk:
+                yield chunk
+    resp = Response(generate(), mimetype=mime)
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 
 @app.get("/api/talk/health")

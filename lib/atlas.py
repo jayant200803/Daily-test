@@ -51,6 +51,16 @@ def synthesize(text, voice, out_path, response_format="wav"):
     return {"status": r.status_code, "first_audio_header_ms": hdr_first,
             "first_byte_ms": first_byte_ms, "total_ms": total_ms, "bytes": total, "file": out_path}
 
+# ---- Speak: streaming passthrough (for low-latency playback) ----
+def speak_stream(text, voice, response_format="mp3"):
+    """Return the raw streaming requests.Response from atlas-speak so the caller
+    can pipe audio chunks straight to the browser (play starts at first audio)."""
+    body = {"model": SPEAK_MODEL, "voice": voice, "input": text, "response_format": response_format}
+    return requests.post(f"{BASE_URL}/v1/audio/speech",
+                         headers={**_auth(), "Content-Type": "application/json"},
+                         json=body, stream=True, timeout=120)
+
+
 def list_models():
     r = requests.get(f"{BASE_URL}/v1/models", headers=_auth(), timeout=30)
     return r.status_code, (r.json() if r.ok else r.text[:300])
