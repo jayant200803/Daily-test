@@ -6,7 +6,9 @@ def _key():
     k = os.environ.get("ATLAS_API_KEY")
     if not k:
         raise SystemExit("ATLAS_API_KEY is not set. Copy .env.example to .env and add your key.")
-    return k
+    # Strip stray whitespace/newlines (common when pasting into a host's env-var box);
+    # a newline in the key makes the Authorization header invalid.
+    return k.strip()
 
 def _auth():
     return {"Authorization": f"Bearer {_key()}"}
