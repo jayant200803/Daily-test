@@ -570,7 +570,7 @@ let ws=null, ctx=null, stream=null, proc=null, src=null, on=false, replying=fals
 let audioEpoch=0, curLine='', interimActive=false;
 let uAudioStart=0, uFirst=null, uTTFP=null, uAudioEnd=null;
 let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0;
-const ENDTURN_MS = 1000;   // silence after a phrase before we treat the turn as finished
+const ENDTURN_MS = 600;   // extra silence after a phrase before we treat the turn as finished (snappy but tolerates short pauses)
 const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
 const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
 const pLat=document.getElementById('pLat'), pPlayer=document.getElementById('pPlayer');
