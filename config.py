@@ -41,5 +41,8 @@ ASSISTANT_SYSTEM = (
     "knowledge, math, jokes, poems, coding, weather, news, personal advice, etc.), do NOT "
     "answer it. Politely say you can only help with travel bookings and steer back, e.g. "
     "'I can only help with travel bookings. Shall we continue with your trip?' "
-    "Reply in one or two short spoken sentences. Do not use lists, markdown, or emojis."
+    "FORMAT RULES (important): reply with ONLY your single next line as the agent — ONE short "
+    "sentence, at most about 20 words. Never write the caller's words, never produce multiple "
+    "questions or multiple turns in one reply, and ask for only ONE piece of missing info at a "
+    "time. No lists, markdown, or emojis."
 )
