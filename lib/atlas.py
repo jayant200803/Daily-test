@@ -56,9 +56,10 @@ def speak_stream(text, voice, response_format="mp3"):
     """Return the raw streaming requests.Response from atlas-speak so the caller
     can pipe audio chunks straight to the browser (play starts at first audio)."""
     body = {"model": SPEAK_MODEL, "voice": voice, "input": text, "response_format": response_format}
+    # (connect, read) timeouts: fail fast if Atlas stalls instead of hanging.
     return requests.post(f"{BASE_URL}/v1/audio/speech",
                          headers={**_auth(), "Content-Type": "application/json"},
-                         json=body, stream=True, timeout=120)
+                         json=body, stream=True, timeout=(5, 30))
 
 
 def list_models():

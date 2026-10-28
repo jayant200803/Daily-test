@@ -650,17 +650,17 @@ async function finalizeTurn() {
   try {
     // full conversation (incl. this turn) so the model remembers context
     const history = convo.map(o => ({ role: o.role==='atlas' ? 'assistant' : 'user', content: o.text }));
-    // 1) LLM only (fast)
+    // 1) LLM only (fast) — 20s safety timeout
     const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text, history})});
+      body:JSON.stringify({text, history}), signal:AbortSignal.timeout(20000)});
     const j=await r.json();
     if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
     const llmDone=performance.now();
 
-    // 2) fetch the (short) mp3 fully, THEN play — avoids mid-reply underrun/stall.
+    // 2) fetch the (short) mp3 fully, THEN play — 25s safety timeout so it can never hang.
     const voice=document.getElementById('pVoice').value;
     const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
-    const ar=await fetch(url);
+    const ar=await fetch(url, {signal:AbortSignal.timeout(25000)});
     if(!ar.ok){ const ej=await ar.json().catch(()=>({})); pReply.innerHTML='<span class="err">TTS error: '+esc(ej.error||('HTTP '+ar.status))+'</span>'; resumeListening(); return; }
     const blob=await ar.blob();
     pPlayer.src=URL.createObjectURL(blob); pPlayer.style.display='block';
@@ -675,7 +675,10 @@ async function finalizeTurn() {
     pPlayer.onended = () => resumeListening();
     pPlayer.onerror = () => resumeListening();
     pPlayer.play().catch(()=>{ resumeListening(); });
-  } catch(e){ pReply.innerHTML='<span class="err">'+esc(e.message)+'</span>'; resumeListening(); }
+  } catch(e){
+    const msg = (e && (e.name==='TimeoutError'||e.name==='AbortError')) ? 'Timed out — Atlas was slow. Please try again.' : (e && e.message) || 'error';
+    pReply.innerHTML='<span class="err">'+esc(msg)+'</span>'; resumeListening();
+  }
 }
 
 function resumeListening(){
@@ -916,31 +919,31 @@ def api_speak_stream():
     fmt = (request.args.get("format") or "mp3").strip()
     mime = {"mp3": "audio/mpeg", "wav": "audio/wav", "opus": "audio/ogg", "pcm": "audio/basic"}.get(fmt, "audio/mpeg")
 
-    upstream = None
+    # Buffer the full (short) mp3 server-side and return a bounded response. More
+    # reliable than chunked streaming (clean Content-Length, no client-side hang).
     last = None
+    audio = None
     for attempt in range(3):
-        upstream = atlas.speak_stream(text, voice=voice, response_format=fmt)
-        if upstream.status_code == 200:
+        try:
+            r = atlas.speak_stream(text, voice=voice, response_format=fmt)
+        except Exception as e:
+            last = f"exc:{e}"; time.sleep(0.4 * (attempt + 1)); continue
+        if r.status_code == 200:
+            audio = r.content          # read fully, then upstream closes
             break
-        last = upstream.status_code
-        upstream.close()
-        if upstream.status_code in (429, 500, 502, 503, 504) and attempt < 2:
+        last = r.status_code
+        r.close()
+        if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
             time.sleep(0.5 * (attempt + 1))   # brief backoff, then retry
             continue
         break
-    if upstream is None or upstream.status_code != 200:
+    if not audio:
         g._detail = f"SPEAK_STREAM fail status={last}"
         return jsonify(ok=False, error=f"atlas-speak returned {last}",
                        detail="Atlas was temporarily unavailable; please try again."), 502
-    g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)}"
-
-    def generate():
-        for chunk in upstream.iter_content(chunk_size=2048):
-            if chunk:
-                yield chunk
-    resp = Response(generate(), mimetype=mime)
+    g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)} bytes={len(audio)}"
+    resp = Response(audio, mimetype=mime)
     resp.headers["Cache-Control"] = "no-store"
-    resp.headers["X-Accel-Buffering"] = "no"
     return resp
 
 
