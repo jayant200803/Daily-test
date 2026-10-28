@@ -560,8 +560,7 @@ PIPELINE_PAGE = """<!doctype html>
   <div class="card">
     <h2>🔊 Atlas reply</h2>
     <audio id="pPlayer" controls style="width:100%; display:none; margin-bottom:10px"></audio>
-    <div class="result" id="pReply"><span class="meta">The spoken reply and pipeline latency will appear here.</span></div>
-    <div class="lat" id="pLat"></div>
+    <div class="result" id="pReply"><span class="meta">Each reply shows its latency inline above (reply = LLM + TTS).</span></div>
   </div>
 </div>
 
@@ -578,10 +577,14 @@ const pLat=document.getElementById('pLat'), pPlayer=document.getElementById('pPl
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 pBtn.onclick = () => { on ? hardStop() : start(); };
 
+function latTag(l){
+  if(!l) return '';
+  return ' <span style="color:var(--muted);font-size:12px">· reply '+l.total+'ms (LLM '+l.llm+'ms · TTS '+l.tts+'ms)</span>';
+}
 function render() {
   const log = convo.map(o => o.role==='you'
     ? '<div style="margin:6px 0"><span class="meta">🧑 you:</span> '+esc(o.text)+'</div>'
-    : '<div style="margin:6px 0"><span class="meta">🤖 atlas:</span> <b>'+esc(o.text)+'</b></div>'
+    : '<div style="margin:6px 0"><span class="meta">🤖 atlas:</span> <b>'+esc(o.text)+'</b>'+latTag(o.lat)+'</div>'
   ).join('');
   const cur = curLine ? '<div style="margin:6px 0"><span class="meta">🧑 you:</span> <span style="color:var(--muted)">'+esc(curLine)+'</span></div>' : '';
   pOut.innerHTML = (log||cur) ? (log+cur) : '<span class="meta">Listening…</span>';
@@ -641,8 +644,7 @@ async function finalizeTurn() {
   const text = turnBuf.trim(); turnBuf='';
   if(!text || replying || !on) return;
   replying=true;                         // stop listening while we reply (prevents echo)
-  // anchor latency to when the user ACTUALLY stopped speaking (honest voice-to-voice)
-  tTurnEnd = lastSpeechEndWall || performance.now();
+  const tStart=performance.now();        // reliable wall-clock: turn captured -> reply ready
   convo.push({role:'you', text}); render();
   pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
@@ -654,23 +656,22 @@ async function finalizeTurn() {
     const j=await r.json();
     if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
     const llmDone=performance.now();
-    convo.push({role:'atlas', text:j.reply}); render();
 
-    // 2) fetch the (short) mp3 fully, THEN play — avoids mid-reply underrun/stall that
-    //    happens with progressive playback when Atlas generates at ~real-time.
+    // 2) fetch the (short) mp3 fully, THEN play — avoids mid-reply underrun/stall.
     const voice=document.getElementById('pVoice').value;
     const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
     const ar=await fetch(url);
     if(!ar.ok){ const ej=await ar.json().catch(()=>({})); pReply.innerHTML='<span class="err">TTS error: '+esc(ej.error||('HTTP '+ar.status))+'</span>'; resumeListening(); return; }
     const blob=await ar.blob();
     pPlayer.src=URL.createObjectURL(blob); pPlayer.style.display='block';
-    const t=j.timings||{};
-    const e2e=Math.round(performance.now()-tTurnEnd);              // you stop -> reply ready
-    const ttfa=Math.round(performance.now()-llmDone);              // LLM done -> reply ready
-    pReply.innerHTML='<div class="meta">Last reply latency:</div>';
-    pLat.innerHTML = chip(e2e,'End-to-end','you stop → reply')
-      + chip(t.llm_ms,'LLM', esc(j.model||''))
-      + chip(ttfa,'TTS','atlas-speak');
+
+    // per-reply latency (reliable wall-clock): total = turn captured -> reply ready
+    const total=Math.round(performance.now()-tStart);
+    const tts=Math.round(performance.now()-llmDone);
+    const llm=(j.timings&&j.timings.llm_ms!=null)?j.timings.llm_ms:Math.max(0,total-tts);
+    convo.push({role:'atlas', text:j.reply, lat:{total, llm, tts}}); render();
+    pReply.innerHTML='<span class="meta">Latency is shown next to each reply above.</span>';
+
     pPlayer.onended = () => resumeListening();
     pPlayer.onerror = () => resumeListening();
     pPlayer.play().catch(()=>{ resumeListening(); });
