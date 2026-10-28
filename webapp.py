@@ -10,7 +10,7 @@ Endpoints hit Atlas exactly per the docs, via lib/atlas.py:
 Run:   python webapp.py
 Then open http://127.0.0.1:5000  (or the LAN address it prints) in a browser.
 """
-import os, tempfile, time, logging
+import os, tempfile, time, logging, base64
 from flask import Flask, request, jsonify, send_file, Response, render_template_string, g
 
 try:
@@ -19,8 +19,8 @@ try:
 except ImportError:
     pass
 
-from config import SPEAK_VOICE
-from lib import atlas
+from config import SPEAK_VOICE, ASSISTANT_SYSTEM, LLM_KEY_ENV, LLM_MODEL
+from lib import atlas, llm
 
 app = Flask(__name__)
 
@@ -146,6 +146,26 @@ PAGE = """<!doctype html>
     </div>
     <audio id="player" controls style="width:100%; margin-top:12px; display:none"></audio>
     <div class="result" id="ttsOut" style="display:none"></div>
+  </div>
+
+  <div class="card">
+    <h2>🗣️ Talk to Atlas (speech-to-speech)</h2>
+    <p class="meta" style="margin:0 0 12px">Day-2 pipeline (OpenAI-compatible): you speak &rarr; <b>atlas-listen</b> (STT) &rarr; <b>LLM</b> reply &rarr; <b>atlas-speak</b> (TTS) &rarr; you hear the answer.</p>
+    <div class="row">
+      <button id="talkBtn">Start talking</button>
+      <span id="talkStatus" class="meta"></span>
+    </div>
+    <label>Language (your speech)</label>
+    <select id="talkLang"><option value="en" selected>en (English)</option><option value="ja">ja (Japanese)</option></select>
+    <label>Reply voice</label>
+    <select id="talkVoice">
+      <option value="ayaka">ayaka</option><option value="emi">emi</option><option value="kaito">kaito</option>
+      <option value="sakura">sakura</option><option value="souta" selected>souta — default</option><option value="nanami">nanami</option>
+      <option value="haruto">haruto</option><option value="mei">mei</option><option value="yuto">yuto</option>
+      <option value="rina">rina</option><option value="ren">ren</option><option value="hajun">hajun</option>
+    </select>
+    <audio id="talkPlayer" controls style="width:100%; margin-top:12px; display:none"></audio>
+    <div class="result" id="talkOut" style="min-height:40px; margin-top:12px"><span class="meta">Your conversation will appear here.</span></div>
   </div>
 </div>
 
@@ -411,6 +431,65 @@ function b64(buf) {
   for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
   return btoa(s);
 }
+
+// ---------- Day-2: Talk to Atlas (speech -> STT -> LLM -> TTS -> speech) ----------
+let talkRec = false, talkCtx, talkStream, talkProc, talkSrc, talkBufs = [], talkSr = 16000;
+const talkBtn = document.getElementById('talkBtn');
+const talkStatus = document.getElementById('talkStatus');
+const talkOut = document.getElementById('talkOut');
+const talkPlayer = document.getElementById('talkPlayer');
+
+talkBtn.onclick = async () => { talkRec ? await talkStopSend() : await talkStart(); };
+
+async function talkStart() {
+  try { talkStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
+  catch (e) { talkOut.innerHTML = '<span class="err">Microphone blocked: '+e.message+'</span>'; return; }
+  talkCtx = new (window.AudioContext || window.webkitAudioContext)();
+  talkSr = talkCtx.sampleRate;
+  talkSrc = talkCtx.createMediaStreamSource(talkStream);
+  talkProc = talkCtx.createScriptProcessor(4096, 1, 1);
+  talkBufs = [];
+  talkProc.onaudioprocess = e => talkBufs.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+  talkSrc.connect(talkProc); talkProc.connect(talkCtx.destination);
+  talkRec = true;
+  talkBtn.textContent = 'Stop & send'; talkBtn.classList.add('rec');
+  talkStatus.innerHTML = '<span class="dot"></span>listening…';
+}
+
+async function talkStopSend() {
+  talkRec = false;
+  try { talkProc.disconnect(); talkSrc.disconnect(); talkStream.getTracks().forEach(t=>t.stop()); await talkCtx.close(); } catch {}
+  talkBtn.textContent = 'Start talking'; talkBtn.classList.remove('rec');
+  talkStatus.textContent = 'thinking…';
+
+  const wav = encodeWav(flatten(talkBufs), talkSr);
+  const fd = new FormData();
+  fd.append('file', new Blob([wav], {type:'audio/wav'}), 'talk.wav');
+  fd.append('language', document.getElementById('talkLang').value);
+  fd.append('voice', document.getElementById('talkVoice').value);
+
+  try {
+    const r = await fetch('/api/talk', { method:'POST', body: fd });
+    const j = await r.json();
+    talkStatus.textContent = '';
+    if (!j.ok) {
+      const where = j.stage ? (' ['+j.stage+']') : '';
+      talkOut.innerHTML = '<span class="err">Error'+where+': '+escapeHtml(j.error||('HTTP '+r.status))+'</span>'
+        + (j.heard ? '<div class="meta" style="margin-top:6px">heard: "'+escapeHtml(j.heard)+'"</div>' : '');
+      return;
+    }
+    // play the spoken reply
+    const bytes = atob(j.audio_b64); const arr = new Uint8Array(bytes.length);
+    for (let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+    talkPlayer.src = URL.createObjectURL(new Blob([arr], {type:'audio/wav'}));
+    talkPlayer.style.display='block'; talkPlayer.play();
+    const t = j.timings || {};
+    talkOut.innerHTML =
+      '<div style="margin-bottom:6px"><span class="meta">You said:</span> '+escapeHtml(j.heard)+'</div>'
+      + '<div><span class="meta">Atlas replied:</span> <b>'+escapeHtml(j.reply)+'</b></div>'
+      + '<div class="meta" style="margin-top:8px; font-size:12px">STT '+(t.stt_ms||'?')+'ms · LLM '+(t.llm_ms||'?')+'ms · TTS first-audio '+(t.tts_first_audio_ms||'?')+'ms · '+escapeHtml(j.model||'')+'</div>';
+  } catch (e) { talkStatus.textContent=''; talkOut.innerHTML = '<span class="err">'+escapeHtml(e.message)+'</span>'; }
+}
 </script>
 </body>
 </html>"""
@@ -515,6 +594,95 @@ def api_tts():
     if res.get("first_audio_header_ms"):
         resp.headers["X-Atlas-First-Audio-Ms"] = str(res["first_audio_header_ms"])
     return resp
+
+
+@app.post("/api/talk")
+def api_talk():
+    """Day-2 full speech-to-speech pipeline (OpenAI-compatible integration):
+    mic audio -> atlas-listen (STT) -> LLM reply -> atlas-speak (TTS) -> audio back.
+    Returns JSON with the transcript, the reply text, the reply audio (base64), and
+    per-stage timings."""
+    missing = _key_missing()
+    if missing:
+        return missing
+    if not os.environ.get(LLM_KEY_ENV):
+        return jsonify(ok=False, stage="llm",
+                       error=f"{LLM_KEY_ENV} is not set on the server. Add it in Vercel "
+                             f"env vars and redeploy."), 500
+    f = request.files.get("file")
+    if not f:
+        return jsonify(ok=False, error="no audio file"), 400
+    language = request.form.get("language", "en") or "en"
+    voice = (request.form.get("voice") or SPEAK_VOICE).strip()
+
+    tmp_in = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    tmp_out.close()
+    try:
+        f.save(tmp_in.name)
+        tmp_in.close()
+
+        # 1) STT
+        stt = atlas.transcribe(tmp_in.name, language=language, content_type="audio/wav")
+        heard = (stt.get("text") or "").strip()
+        if stt.get("status") != 200 or not heard:
+            g._detail = f"TALK stt_fail status={stt.get('status')}"
+            return jsonify(ok=False, stage="stt", status=stt.get("status"),
+                           error="Could not transcribe audio", detail=stt.get("raw"),
+                           heard=heard), 502
+
+        # 2) LLM reply
+        chat = llm.chat(heard, system=ASSISTANT_SYSTEM)
+        reply = (chat.get("text") or "").strip()
+        if chat.get("status") != 200 or not reply:
+            g._detail = f"TALK llm_fail status={chat.get('status')}"
+            return jsonify(ok=False, stage="llm", status=chat.get("status"),
+                           error=chat.get("error") or "LLM returned no text",
+                           heard=heard), 502
+
+        # 3) TTS
+        tts = atlas.synthesize(reply, voice=voice, out_path=tmp_out.name, response_format="wav")
+        if tts.get("status") != 200 or not tts.get("bytes"):
+            g._detail = f"TALK tts_fail status={tts.get('status')}"
+            return jsonify(ok=False, stage="tts", status=tts.get("status"),
+                           error=f"atlas-speak returned {tts.get('status')}",
+                           heard=heard, reply=reply), 502
+
+        with open(tmp_out.name, "rb") as fh:
+            audio_b64 = base64.b64encode(fh.read()).decode("ascii")
+
+        g._detail = (f"TALK ok heard={len(heard)}c reply={len(reply)}c "
+                     f"stt={stt.get('elapsed_ms')}ms llm={chat.get('elapsed_ms')}ms "
+                     f"tts_first={tts.get('first_audio_header_ms')}ms voice={voice}")
+        return jsonify(ok=True, heard=heard, reply=reply, audio_b64=audio_b64,
+                       model=LLM_MODEL, voice=voice,
+                       timings={"stt_ms": stt.get("elapsed_ms"),
+                                "llm_ms": chat.get("elapsed_ms"),
+                                "tts_first_audio_ms": tts.get("first_audio_header_ms"),
+                                "tts_total_ms": tts.get("total_ms")})
+    finally:
+        for p in (tmp_in.name, tmp_out.name):
+            try: os.unlink(p)
+            except OSError: pass
+
+
+@app.get("/api/talk/health")
+def api_talk_health():
+    """Report whether both keys the pipeline needs are present + reachable."""
+    out = {"atlas_key": bool(os.environ.get("ATLAS_API_KEY")),
+           "llm_key": bool(os.environ.get(LLM_KEY_ENV)), "llm_model": LLM_MODEL}
+    try:
+        code, _ = atlas.list_models()
+        out["atlas_status"] = code
+    except Exception as e:
+        out["atlas_status"] = f"err:{e}"
+    if out["llm_key"]:
+        probe = llm.chat("ping", system="Reply with the word pong only.")
+        out["llm_status"] = probe.get("status")
+        if probe.get("error"):
+            out["llm_error"] = probe["error"]
+    out["ok"] = out["atlas_key"] and out["llm_key"] and out.get("atlas_status") == 200 and out.get("llm_status") == 200
+    return jsonify(out), (200 if out["ok"] else 500)
 
 
 if __name__ == "__main__":

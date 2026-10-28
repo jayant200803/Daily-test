@@ -1,30 +1,39 @@
-"""Tiny OpenAI chat client for the Day-2 speech pipeline.
+"""LLM client for the Day-2 speech pipeline (the 'reply' step).
 
-Separate from lib/atlas.py on purpose: the Atlas "docs only" golden rule governs
-the Atlas calls; the LLM in the middle is a different provider (OpenAI).
-Uses plain requests (no SDK dependency) against the documented Chat Completions API.
+Provider-agnostic as long as it's OpenAI-compatible; configured in config.py.
+Default = Groq. Kept separate from lib/atlas.py because the Atlas "docs only"
+golden rule governs the Atlas calls, not this third-party LLM.
 """
 import os
 import time
 import requests
 
-OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+from config import LLM_BASE_URL, LLM_MODEL, LLM_KEY_ENV
 
 
-def chat(user_text, system=None, model="gpt-4o-mini", temperature=0.4):
-    key = os.environ.get("OPENAI_API_KEY")
+def chat(user_text, system=None, model=None):
+    key = os.environ.get(LLM_KEY_ENV)
     if not key:
-        return {"status": None, "error": "OPENAI_API_KEY not set on the server"}
+        return {"status": None, "error": f"{LLM_KEY_ENV} not set on the server"}
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": user_text})
+    body = {
+        "model": model or LLM_MODEL,
+        "messages": messages,
+        "temperature": 0.4,
+        "max_tokens": 300,
+        # gpt-oss on Groq is a reasoning model; keep reasoning minimal so the
+        # spoken reply comes back fast and 'content' isn't eaten by reasoning tokens.
+        "reasoning_effort": "low",
+    }
     t0 = time.time()
     try:
         r = requests.post(
-            OPENAI_URL,
+            f"{LLM_BASE_URL}/chat/completions",
             headers={"Authorization": f"Bearer {key.strip()}", "Content-Type": "application/json"},
-            json={"model": model, "messages": messages, "temperature": temperature},
+            json=body,
             timeout=60,
         )
     except requests.RequestException as e:
@@ -33,9 +42,9 @@ def chat(user_text, system=None, model="gpt-4o-mini", temperature=0.4):
     try:
         j = r.json()
         if r.ok:
-            out["text"] = j["choices"][0]["message"]["content"]
+            out["text"] = (j["choices"][0]["message"].get("content") or "").strip()
         else:
-            out["error"] = j.get("error", {}).get("message") or str(j)[:200]
+            out["error"] = (j.get("error", {}) or {}).get("message") or str(j)[:200]
     except Exception:
         out["error"] = r.text[:300]
     return out

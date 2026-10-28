@@ -23,3 +23,14 @@ PRON_WORDS = []            # e.g. ["OneInbox", "Exotel"]
 
 # --- Concurrency test ---
 CONCURRENCY_ATTEMPT = 6    # open this many at once; expect the limit+1 to be refused
+
+# --- Day-2 speech-to-speech pipeline: the LLM in the middle ---
+# Atlas has NO LLM (chat 404s), so the "reply" step uses a separate OpenAI-compatible
+# provider. Default = Groq (free, fast). To switch providers, change these three lines.
+LLM_BASE_URL = "https://api.groq.com/openai/v1"   # OpenAI-compatible base
+LLM_MODEL    = "openai/gpt-oss-20b"               # a model this key can use
+LLM_KEY_ENV  = "GROQ_API_KEY"                      # env var holding the LLM key
+ASSISTANT_SYSTEM = (
+    "You are a friendly, concise voice assistant for a travel booking call center. "
+    "Reply in one or two short spoken sentences. Do not use lists, markdown, or emojis."
+)
