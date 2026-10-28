@@ -109,6 +109,8 @@ PAGE = """<!doctype html>
 <script>
 // ---------- STT: capture mic as 16-bit PCM mono WAV (Atlas-accepted) ----------
 let recording = false, audioCtx, stream, procNode, srcNode, buffers = [], sr = 16000;
+let recTimer = null, recElapsed = 0;
+const MAX_SECONDS = 90;   // 1:30 cap
 const recBtn = document.getElementById('recBtn');
 const recStatus = document.getElementById('recStatus');
 const sttOut = document.getElementById('sttOut');
@@ -130,11 +132,20 @@ async function startRec() {
   srcNode.connect(procNode); procNode.connect(audioCtx.destination);
   recording = true;
   recBtn.textContent = 'Stop & transcribe'; recBtn.classList.add('rec');
-  recStatus.innerHTML = '<span class="dot"></span>recording…';
+  recElapsed = 0;
+  const fmt = s => (Math.floor(s/60))+':'+String(s%60).padStart(2,'0');
+  const paint = () => { recStatus.innerHTML = '<span class="dot"></span>recording '+fmt(recElapsed)+' / '+fmt(MAX_SECONDS); };
+  paint();
+  recTimer = setInterval(() => {
+    recElapsed++; paint();
+    if (recElapsed >= MAX_SECONDS) { stopRec(); }   // auto-stop at 1:30
+  }, 1000);
 }
 
 async function stopRec() {
+  if (!recording) return;          // guard: timer + click can both fire
   recording = false;
+  if (recTimer) { clearInterval(recTimer); recTimer = null; }
   procNode.disconnect(); srcNode.disconnect();
   stream.getTracks().forEach(t => t.stop());
   await audioCtx.close();

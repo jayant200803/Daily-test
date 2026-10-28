@@ -63,10 +63,11 @@ def _play_wav(path):
 def stt_live():
     """Record from the mic, send to atlas-listen, print the transcript."""
     try:
-        secs = input("  seconds to record [30]: ").strip()
-        secs = int(secs) if secs else 30
+        secs = input("  seconds to record [90]: ").strip()
+        secs = int(secs) if secs else 90
     except ValueError:
-        secs = 30
+        secs = 90
+    secs = min(secs, 90)   # cap at 1:30
     lang = input("  language [en]: ").strip() or "en"
     prompt = input("  optional vocabulary hint (comma words, blank=none): ").strip()
 
