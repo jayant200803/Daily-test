@@ -193,13 +193,45 @@ speakBtn.onclick = async () => {
 </html>"""
 
 
+def _key_missing():
+    """Return a JSON 500 if the server has no Atlas key, else None."""
+    if not os.environ.get("ATLAS_API_KEY"):
+        return jsonify(ok=False, error="ATLAS_API_KEY is not set on the server. "
+                       "On Vercel: Project > Settings > Environment Variables, add "
+                       "ATLAS_API_KEY, then redeploy."), 500
+    return None
+
+
+# Any uncaught error returns JSON (not an HTML page), so the browser shows the real reason.
+@app.errorhandler(Exception)
+def _json_errors(e):
+    from werkzeug.exceptions import HTTPException
+    code = e.code if isinstance(e, HTTPException) else 500
+    return jsonify(ok=False, error=type(e).__name__, detail=str(e)), code
+
+
 @app.get("/")
 def index():
     return render_template_string(PAGE.replace("__VOICE__", SPEAK_VOICE))
 
 
+@app.get("/api/health")
+def api_health():
+    """Quick check: is the key set and can we reach Atlas? Returns JSON."""
+    if not os.environ.get("ATLAS_API_KEY"):
+        return jsonify(ok=False, key_set=False, error="ATLAS_API_KEY not set on server"), 500
+    try:
+        code, _ = atlas.list_models()
+        return jsonify(ok=code == 200, key_set=True, models_status=code)
+    except Exception as e:
+        return jsonify(ok=False, key_set=True, error=type(e).__name__, detail=str(e)), 502
+
+
 @app.post("/api/stt")
 def api_stt():
+    missing = _key_missing()
+    if missing:
+        return missing
     f = request.files.get("file")
     if not f:
         return jsonify(ok=False, error="no audio file"), 400
@@ -220,6 +252,9 @@ def api_stt():
 
 @app.post("/api/tts")
 def api_tts():
+    missing = _key_missing()
+    if missing:
+        return missing
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
     if not text:
@@ -229,9 +264,10 @@ def api_tts():
     tmp.close()
     res = atlas.synthesize(text, voice=voice, out_path=tmp.name, response_format="wav")
     if res.get("status") != 200 or not res.get("bytes"):
+        detail = res.get("raw") or res.get("error")
         try: os.unlink(tmp.name)
         except OSError: pass
-        return jsonify(error=f"atlas-speak returned {res.get('status')}"), 502
+        return jsonify(ok=False, error=f"atlas-speak returned {res.get('status')}", detail=detail), 502
     resp = send_file(tmp.name, mimetype="audio/wav", as_attachment=False, download_name="speech.wav")
     if res.get("first_audio_header_ms"):
         resp.headers["X-Atlas-First-Audio-Ms"] = str(res["first_audio_header_ms"])
