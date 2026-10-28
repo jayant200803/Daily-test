@@ -536,9 +536,9 @@ PIPELINE_PAGE = """<!doctype html>
 
   <div class="card">
     <h2>🗣️ Converse</h2>
-    <p class="meta" style="margin:0 0 12px">Click start, speak, then <b>Stop &amp; get reply</b>. You speak &rarr; <b>atlas-listen</b> (live STT) &rarr; <b>LLM</b> &rarr; <b>atlas-speak</b> (TTS) &rarr; you hear the answer.</p>
+    <p class="meta" style="margin:0 0 12px">Click start and just talk. When you pause, Atlas replies automatically, then listens again — like a real voice agent. You speak &rarr; <b>atlas-listen</b> (live STT) &rarr; <b>LLM</b> &rarr; <b>atlas-speak</b> (TTS) &rarr; you hear the answer.</p>
     <div class="row">
-      <button id="pBtn">Start</button>
+      <button id="pBtn">Start conversation</button>
       <span id="pStatus" class="meta"></span>
     </div>
     <label>Language (your speech)</label>
@@ -566,30 +566,33 @@ PIPELINE_PAGE = """<!doctype html>
 </div>
 
 <script>
-let ws=null, ctx=null, stream=null, proc=null, src=null, on=false;
-let audioEpoch=0, committed=[], curLine='', interimActive=false;
+let ws=null, ctx=null, stream=null, proc=null, src=null, on=false, replying=false;
+let audioEpoch=0, curLine='', interimActive=false;
 let uAudioStart=0, uFirst=null, uTTFP=null, uAudioEnd=null;
-let tStop=0;
+let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0;
+const ENDTURN_MS = 1000;   // silence after a phrase before we treat the turn as finished
 const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
 const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
 const pLat=document.getElementById('pLat'), pPlayer=document.getElementById('pPlayer');
 
 const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-pBtn.onclick = () => { on ? stopAndRespond() : start(); };
+pBtn.onclick = () => { on ? hardStop() : start(); };
 
 function render() {
-  const lines = committed.map(o => {
-    const tags=[]; if(o.ttfp!=null) tags.push('ttfp '+o.ttfp+'ms'); if(o.eot!=null) tags.push('eot '+o.eot+'ms');
-    const t = tags.length ? ' <span style="color:var(--muted);font-size:12px">· '+tags.join(' · ')+'</span>' : '';
-    return '<div><span style="color:var(--fg)">'+esc(o.text)+'</span>'+t+'</div>';
-  }).join('');
-  const cur = curLine ? '<div><span style="color:var(--muted)">'+esc(curLine)+'</span></div>' : '';
-  pOut.innerHTML = (lines||cur) ? (lines+cur) : '<span class="meta">Listening…</span>';
+  const log = convo.map(o => o.role==='you'
+    ? '<div style="margin:6px 0"><span class="meta">🧑 you:</span> '+esc(o.text)+'</div>'
+    : '<div style="margin:6px 0"><span class="meta">🤖 atlas:</span> <b>'+esc(o.text)+'</b></div>'
+  ).join('');
+  const cur = curLine ? '<div style="margin:6px 0"><span class="meta">🧑 you:</span> <span style="color:var(--muted)">'+esc(curLine)+'</span></div>' : '';
+  pOut.innerHTML = (log||cur) ? (log+cur) : '<span class="meta">Listening…</span>';
+  pOut.scrollTop = pOut.scrollHeight;
 }
-function markFirst(txt){ if(uFirst===null && txt && txt.trim()){ uFirst=performance.now(); uTTFP=Math.max(0,Math.round(uFirst-(audioEpoch+uAudioStart))); pStatus.innerHTML='<span class="dot"></span>live · ttfp '+uTTFP+'ms'; } }
+function markFirst(txt){ if(uFirst===null && txt && txt.trim()){ uFirst=performance.now(); uTTFP=Math.max(0,Math.round(uFirst-(audioEpoch+uAudioStart))); } }
+function scheduleEndTurn(){ clearTimeout(endTurnTimer); endTurnTimer=setTimeout(finalizeTurn, ENDTURN_MS); }
 
 async function start() {
-  committed=[]; curLine=''; interimActive=false; audioEpoch=0; uAudioStart=0; uFirst=null; uTTFP=null; uAudioEnd=null;
+  convo=[]; curLine=''; interimActive=false; turnBuf=''; replying=false;
+  audioEpoch=0; uAudioStart=0; uFirst=null; uTTFP=null; uAudioEnd=null;
   pReply.innerHTML='<span class="meta">…</span>'; pLat.innerHTML=''; pPlayer.style.display='none';
   pOut.innerHTML='<span class="meta">connecting…</span>';
   let key;
@@ -605,19 +608,21 @@ async function start() {
       transcription:{model:'atlas-listen',language:document.getElementById('pLang').value,prompt:undefined},
       turn_detection:{type:'server_vad',silence_duration_ms:500}}},atlas:{interim:true}}}));
     src=ctx.createMediaStreamSource(stream); proc=ctx.createScriptProcessor(4096,1,1);
-    proc.onaudioprocess=e=>{ if(!on||ws.readyState!==1) return; const f=e.inputBuffer.getChannelData(0); const i=new Int16Array(f.length);
+    proc.onaudioprocess=e=>{ if(!on||replying||ws.readyState!==1) return;   // mute mic while the agent speaks (no echo)
+      const f=e.inputBuffer.getChannelData(0); const i=new Int16Array(f.length);
       for(let k=0;k<f.length;k++){let s=Math.max(-1,Math.min(1,f[k]));i[k]=s<0?s*0x8000:s*0x7FFF;} ws.send(JSON.stringify({type:'input_audio_buffer.append',audio:b64(i.buffer)})); };
     src.connect(proc); proc.connect(ctx.destination); audioEpoch=performance.now(); on=true;
-    pBtn.textContent='Stop & get reply'; pBtn.classList.add('rec'); pStatus.innerHTML='<span class="dot"></span>live'; render();
+    pBtn.textContent='End conversation'; pBtn.classList.add('rec'); pStatus.innerHTML='<span class="dot"></span>listening…'; render();
   };
-  ws.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data);}catch{return;}
+  ws.onmessage=ev=>{ if(replying) return; let m; try{m=JSON.parse(ev.data);}catch{return;}
     switch(m.type){
-      case 'input_audio_buffer.speech_started': uAudioStart=(m.audio_start_ms!=null)?m.audio_start_ms:Math.round(performance.now()-audioEpoch); uFirst=null; uTTFP=null; uAudioEnd=null; curLine=''; interimActive=false; render(); break;
-      case 'conversation.item.input_audio_transcription.interim': interimActive=true; markFirst(m.text); curLine=m.text||''; render(); break;
-      case 'conversation.item.input_audio_transcription.delta': markFirst(m.delta); if(!interimActive){curLine+=(m.delta||'');render();} break;
+      case 'input_audio_buffer.speech_started': clearTimeout(endTurnTimer); uAudioStart=(m.audio_start_ms!=null)?m.audio_start_ms:Math.round(performance.now()-audioEpoch); uFirst=null; uTTFP=null; uAudioEnd=null; curLine=''; interimActive=false; render(); break;
+      case 'conversation.item.input_audio_transcription.interim': clearTimeout(endTurnTimer); interimActive=true; markFirst(m.text); curLine=m.text||''; render(); break;
+      case 'conversation.item.input_audio_transcription.delta': clearTimeout(endTurnTimer); markFirst(m.delta); if(!interimActive){curLine+=(m.delta||'');render();} break;
       case 'input_audio_buffer.speech_stopped': uAudioEnd=(m.audio_end_ms!=null)?m.audio_end_ms:Math.round(performance.now()-audioEpoch); break;
-      case 'conversation.item.input_audio_transcription.completed': { const eot=(uAudioEnd!=null)?Math.max(0,Math.round(performance.now()-(audioEpoch+uAudioEnd))):null;
-        if(m.transcript) committed.push({text:m.transcript,ttfp:uTTFP,eot:eot}); curLine=''; interimActive=false; uFirst=null; uTTFP=null; uAudioEnd=null; render(); break; }
+      case 'conversation.item.input_audio_transcription.completed':
+        if(m.transcript) turnBuf += (turnBuf?' ':'') + m.transcript;
+        curLine=''; interimActive=false; render(); scheduleEndTurn(); break;   // wait ENDTURN_MS of silence -> reply
       case 'error': pStatus.textContent=''; pOut.innerHTML='<span class="err">Atlas error: '+((m.error&&(m.error.message||m.error.code))||'unknown')+'</span>'; hardStop(); break;
     }
   };
@@ -625,37 +630,44 @@ async function start() {
 }
 
 function hardStop() {
-  on=false;
+  on=false; replying=false; clearTimeout(endTurnTimer);
   try{if(proc)proc.disconnect();}catch{} try{if(src)src.disconnect();}catch{}
   try{if(stream)stream.getTracks().forEach(t=>t.stop());}catch{} try{if(ctx)ctx.close();}catch{}
   try{if(ws&&ws.readyState===1)ws.close();}catch{}
-  pBtn.textContent='Start'; pBtn.classList.remove('rec'); pStatus.textContent='';
+  pBtn.textContent='Start conversation'; pBtn.classList.remove('rec'); pStatus.textContent='';
 }
 
-async function stopAndRespond() {
-  tStop=performance.now();            // ~ when the user stopped speaking (for voice-to-voice)
-  hardStop();
-  const transcript=(committed.map(o=>o.text).join(' ')+(curLine?(' '+curLine):'')).trim();
-  if(!transcript){ pReply.innerHTML='<span class="err">Didn\\'t catch anything — try again.</span>'; return; }
-  pStatus.textContent='thinking…'; pReply.innerHTML='<span class="meta">LLM + TTS…</span>';
+async function finalizeTurn() {
+  const text = turnBuf.trim(); turnBuf='';
+  if(!text || replying || !on) return;
+  replying=true;                         // stop listening while we reply (prevents echo)
+  tTurnEnd=performance.now();
+  convo.push({role:'you', text}); render();
+  pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
     const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text:transcript, voice:document.getElementById('pVoice').value})});
-    const j=await r.json(); pStatus.textContent='';
-    if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; return; }
+      body:JSON.stringify({text, voice:document.getElementById('pVoice').value})});
+    const j=await r.json();
+    if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
     const bytes=atob(j.audio_b64); const a=new Uint8Array(bytes.length); for(let i=0;i<bytes.length;i++)a[i]=bytes.charCodeAt(i);
     pPlayer.src=URL.createObjectURL(new Blob([a],{type:'audio/wav'})); pPlayer.style.display='block';
-    const e2e=Math.round(performance.now()-tStop);   // voice-to-voice: stop speaking -> reply ready to play
-    pPlayer.play();
+    const e2e=Math.round(performance.now()-tTurnEnd);   // voice-to-voice: you stop -> reply starts
+    convo.push({role:'atlas', text:j.reply}); render();
     const t=j.timings||{};
-    pReply.innerHTML='<div class="meta">You said:</div><div style="margin-bottom:8px">'+esc(transcript)+'</div>'
-      +'<div class="meta">Atlas replied:</div><div><b>'+esc(j.reply)+'</b></div>';
-    pLat.innerHTML =
-      chip(e2e,'End-to-end','stop speaking → reply')
+    pReply.innerHTML='<div class="meta">Last reply latency:</div>';
+    pLat.innerHTML = chip(e2e,'End-to-end','you stop → reply')
       + chip(t.llm_ms,'LLM', esc(j.model||''))
       + chip(t.tts_first_audio_ms,'TTS first audio','atlas-speak');
-  } catch(e){ pStatus.textContent=''; pReply.innerHTML='<span class="err">'+esc(e.message)+'</span>'; }
+    pPlayer.onended = () => resumeListening();
+    pPlayer.play();
+  } catch(e){ pReply.innerHTML='<span class="err">'+esc(e.message)+'</span>'; resumeListening(); }
 }
+
+function resumeListening(){
+  replying=false;
+  if(on) pStatus.innerHTML='<span class="dot"></span>listening…';
+}
+
 function chip(v,label,sub){ return '<div class="chip"><b>'+(v!=null?v+'ms':'—')+'</b>'+esc(label)+'<br><span>'+sub+'</span></div>'; }
 function b64(buf){ const b=new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
 </script>
