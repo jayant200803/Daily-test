@@ -33,7 +33,7 @@ def chat(user_text=None, system=None, model=None, history=None):
         "model": model or LLM_MODEL,
         "messages": messages,
         "temperature": 0.4,
-        "max_tokens": 300,
+        "max_tokens": 120,   # keep spoken replies short (fast + reliable playback)
         # gpt-oss on Groq is a reasoning model; keep reasoning minimal so the
         # spoken reply comes back fast and 'content' isn't eaten by reasoning tokens.
         "reasoning_effort": "low",

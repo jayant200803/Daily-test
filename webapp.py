@@ -656,23 +656,24 @@ async function finalizeTurn() {
     const llmDone=performance.now();
     convo.push({role:'atlas', text:j.reply}); render();
 
-    // 2) stream TTS — playback starts at first audio (no waiting for the whole clip)
+    // 2) fetch the (short) mp3 fully, THEN play — avoids mid-reply underrun/stall that
+    //    happens with progressive playback when Atlas generates at ~real-time.
     const voice=document.getElementById('pVoice').value;
     const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
-    pPlayer.src=url; pPlayer.style.display='block';
+    const ar=await fetch(url);
+    if(!ar.ok){ const ej=await ar.json().catch(()=>({})); pReply.innerHTML='<span class="err">TTS error: '+esc(ej.error||('HTTP '+ar.status))+'</span>'; resumeListening(); return; }
+    const blob=await ar.blob();
+    pPlayer.src=URL.createObjectURL(blob); pPlayer.style.display='block';
     const t=j.timings||{};
-    let shown=false;
-    pPlayer.onplaying = () => {
-      if(shown) return; shown=true;
-      const e2e=Math.round(performance.now()-tTurnEnd);              // you stop -> first sound
-      const ttfa=Math.round(performance.now()-llmDone);              // LLM done -> first sound
-      pReply.innerHTML='<div class="meta">Last reply latency (time to first sound):</div>';
-      pLat.innerHTML = chip(e2e,'End-to-end','you stop → first sound')
-        + chip(t.llm_ms,'LLM', esc(j.model||''))
-        + chip(ttfa,'TTS → first sound','atlas-speak stream');
-    };
+    const e2e=Math.round(performance.now()-tTurnEnd);              // you stop -> reply ready
+    const ttfa=Math.round(performance.now()-llmDone);              // LLM done -> reply ready
+    pReply.innerHTML='<div class="meta">Last reply latency:</div>';
+    pLat.innerHTML = chip(e2e,'End-to-end','you stop → reply')
+      + chip(t.llm_ms,'LLM', esc(j.model||''))
+      + chip(ttfa,'TTS','atlas-speak');
     pPlayer.onended = () => resumeListening();
-    pPlayer.play().catch(()=>{ /* autoplay guard */ resumeListening(); });
+    pPlayer.onerror = () => resumeListening();
+    pPlayer.play().catch(()=>{ resumeListening(); });
   } catch(e){ pReply.innerHTML='<span class="err">'+esc(e.message)+'</span>'; resumeListening(); }
 }
 
