@@ -282,7 +282,6 @@ function renderLive() {
   const lines = committedLines.map(o => {
     const tags = [];
     if (o.ttfp != null) tags.push('ttfp '+o.ttfp+'ms');
-    if (o.lag  != null) tags.push('lag '+o.lag+'ms');
     if (o.eot  != null) tags.push('eot '+o.eot+'ms');
     const tag = tags.length ? ' <span style="color:var(--muted);font-size:12px">· '+tags.join(' · ')+'</span>' : '';
     return '<div><span style="color:var(--fg)">'+escapeHtml(o.text)+'</span>'+tag+'</div>';
@@ -376,12 +375,11 @@ async function startLive() {
         break;
       case 'conversation.item.input_audio_transcription.completed': {
         const now = performance.now();
-        // Metric 1 — transcript latency (lag): how far behind the audio the final landed
-        const lag = (uAudioEnd != null) ? Math.max(0, Math.round(now - (audioEpoch + uAudioEnd))) : null;
-        // Metric 2 — EOT latency: end-of-speech event -> final transcript
-        const eot = (uStoppedRecv != null) ? Math.max(0, Math.round(now - uStoppedRecv)) : null;
-        // Metric 3 — TTFP already computed as uTTFP
-        if (m.transcript) committedLines.push({ text: m.transcript, ttfp: uTTFP, lag: lag, eot: eot });
+        // EOT (accurate) — from when speech ended in the audio (audio_end_ms) to the final
+        // transcript arriving. Anchored to the audio timeline, not to event arrival gaps.
+        const eot = (uAudioEnd != null) ? Math.max(0, Math.round(now - (audioEpoch + uAudioEnd))) : null;
+        // TTFP already computed as uTTFP
+        if (m.transcript) committedLines.push({ text: m.transcript, ttfp: uTTFP, eot: eot });
         currentLine = ''; interimActive = false;
         uFirstPartial = null; uTTFP = null; uStoppedRecv = null; uAudioEnd = null;
         renderLive(); break;
