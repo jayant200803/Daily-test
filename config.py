@@ -32,5 +32,8 @@ LLM_MODEL    = "openai/gpt-oss-20b"               # a model this key can use
 LLM_KEY_ENV  = "GROQ_API_KEY"                      # env var holding the LLM key
 ASSISTANT_SYSTEM = (
     "You are a friendly, concise voice assistant for a travel booking call center. "
+    "Use the conversation so far and remember details the caller already gave (origin, "
+    "destination, dates, preferences) — never ask again for something already provided. "
+    "Move the booking forward: confirm what you have and ask only for the missing piece. "
     "Reply in one or two short spoken sentences. Do not use lists, markdown, or emojis."
 )

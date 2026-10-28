@@ -569,7 +569,7 @@ PIPELINE_PAGE = """<!doctype html>
 let ws=null, ctx=null, stream=null, proc=null, src=null, on=false, replying=false;
 let audioEpoch=0, curLine='', interimActive=false;
 let uAudioStart=0, uFirst=null, uTTFP=null, uAudioEnd=null;
-let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0;
+let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0, lastSpeechEndWall=0;
 const ENDTURN_MS = 600;   // extra silence after a phrase before we treat the turn as finished (snappy but tolerates short pauses)
 const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
 const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
@@ -619,7 +619,7 @@ async function start() {
       case 'input_audio_buffer.speech_started': clearTimeout(endTurnTimer); uAudioStart=(m.audio_start_ms!=null)?m.audio_start_ms:Math.round(performance.now()-audioEpoch); uFirst=null; uTTFP=null; uAudioEnd=null; curLine=''; interimActive=false; render(); break;
       case 'conversation.item.input_audio_transcription.interim': clearTimeout(endTurnTimer); interimActive=true; markFirst(m.text); curLine=m.text||''; render(); break;
       case 'conversation.item.input_audio_transcription.delta': clearTimeout(endTurnTimer); markFirst(m.delta); if(!interimActive){curLine+=(m.delta||'');render();} break;
-      case 'input_audio_buffer.speech_stopped': uAudioEnd=(m.audio_end_ms!=null)?m.audio_end_ms:Math.round(performance.now()-audioEpoch); break;
+      case 'input_audio_buffer.speech_stopped': uAudioEnd=(m.audio_end_ms!=null)?m.audio_end_ms:Math.round(performance.now()-audioEpoch); lastSpeechEndWall=audioEpoch+uAudioEnd; break;
       case 'conversation.item.input_audio_transcription.completed':
         if(m.transcript) turnBuf += (turnBuf?' ':'') + m.transcript;
         curLine=''; interimActive=false; render(); scheduleEndTurn(); break;   // wait ENDTURN_MS of silence -> reply
@@ -641,13 +641,16 @@ async function finalizeTurn() {
   const text = turnBuf.trim(); turnBuf='';
   if(!text || replying || !on) return;
   replying=true;                         // stop listening while we reply (prevents echo)
-  tTurnEnd=performance.now();
+  // anchor latency to when the user ACTUALLY stopped speaking (honest voice-to-voice)
+  tTurnEnd = lastSpeechEndWall || performance.now();
   convo.push({role:'you', text}); render();
   pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
+    // full conversation (incl. this turn) so the model remembers context
+    const history = convo.map(o => ({ role: o.role==='atlas' ? 'assistant' : 'user', content: o.text }));
     // 1) LLM only (fast)
     const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({text})});
+      body:JSON.stringify({text, history})});
     const j=await r.json();
     if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; resumeListening(); return; }
     const llmDone=performance.now();
@@ -870,9 +873,14 @@ def api_respond():
         return jsonify(ok=False, stage="llm", error=f"{LLM_KEY_ENV} is not set on the server."), 500
     data = request.get_json(silent=True) or {}
     text = (data.get("text") or "").strip()
-    if not text:
+    history = data.get("history")
+    if not text and not history:
         return jsonify(ok=False, error="no text"), 400
-    chat = llm.chat(text, system=ASSISTANT_SYSTEM)
+    # history (full conversation incl. latest user turn) gives the model memory.
+    if isinstance(history, list) and history:
+        chat = llm.chat(system=ASSISTANT_SYSTEM, history=history[-16:])
+    else:
+        chat = llm.chat(text, system=ASSISTANT_SYSTEM)
     reply = (chat.get("text") or "").strip()
     if chat.get("status") != 200 or not reply:
         g._detail = f"RESPOND llm_fail status={chat.get('status')}"

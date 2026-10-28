@@ -11,14 +11,24 @@ import requests
 from config import LLM_BASE_URL, LLM_MODEL, LLM_KEY_ENV
 
 
-def chat(user_text, system=None, model=None):
+def chat(user_text=None, system=None, model=None, history=None):
+    """history: optional list of prior turns [{role:'user'|'assistant', content:str}, ...]
+    ending with the latest user turn. If given, it is used instead of user_text so the
+    model has the full conversation context (prevents re-asking for known details)."""
     key = os.environ.get(LLM_KEY_ENV)
     if not key:
         return {"status": None, "error": f"{LLM_KEY_ENV} not set on the server"}
     messages = []
     if system:
         messages.append({"role": "system", "content": system})
-    messages.append({"role": "user", "content": user_text})
+    if history:
+        for m in history:
+            role = "assistant" if m.get("role") == "assistant" else "user"
+            content = (m.get("content") or "").strip()
+            if content:
+                messages.append({"role": role, "content": content})
+    elif user_text:
+        messages.append({"role": "user", "content": user_text})
     body = {
         "model": model or LLM_MODEL,
         "messages": messages,
