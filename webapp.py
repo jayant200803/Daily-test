@@ -96,19 +96,6 @@ PAGE = """<!doctype html>
   <p class="sub" style="margin-top:-12px"><a href="/pipeline" style="color:#2f81f7">→ Open the Speech-to-Speech pipeline page (live transcription + latency + spoken reply)</a></p>
 
   <div class="card">
-    <h2>🎙️ Speak &rarr; atlas-listen (STT)</h2>
-    <div class="row">
-      <button id="recBtn">Start recording</button>
-      <span id="recStatus" class="meta"></span>
-    </div>
-    <label>Language</label>
-    <select id="lang"><option value="en" selected>en (English)</option><option value="ja">ja (Japanese)</option></select>
-    <label>Vocabulary hint (optional, comma-separated words)</label>
-    <input type="text" id="prompt" placeholder="e.g. OneInbox, Exotel, NS1156">
-    <div class="result" id="sttOut"><span class="meta">Transcript will appear here.</span></div>
-  </div>
-
-  <div class="card">
     <h2>🔴 Live transcription (streaming) &rarr; atlas-listen</h2>
     <p class="meta" style="margin:0 0 12px">Words appear <b>while you speak</b> over a WebSocket. Interim words show dim; finalized text turns solid.</p>
     <div class="row">
@@ -148,108 +135,9 @@ PAGE = """<!doctype html>
     <audio id="player" controls style="width:100%; margin-top:12px; display:none"></audio>
     <div class="result" id="ttsOut" style="display:none"></div>
   </div>
-
-  <div class="card">
-    <h2>🗣️ Talk to Atlas (speech-to-speech)</h2>
-    <p class="meta" style="margin:0 0 12px">Day-2 pipeline (OpenAI-compatible): you speak &rarr; <b>atlas-listen</b> (STT) &rarr; <b>LLM</b> reply &rarr; <b>atlas-speak</b> (TTS) &rarr; you hear the answer.</p>
-    <div class="row">
-      <button id="talkBtn">Start talking</button>
-      <span id="talkStatus" class="meta"></span>
-    </div>
-    <label>Language (your speech)</label>
-    <select id="talkLang"><option value="en" selected>en (English)</option><option value="ja">ja (Japanese)</option></select>
-    <label>Reply voice</label>
-    <select id="talkVoice">
-      <option value="ayaka">ayaka</option><option value="emi">emi</option><option value="kaito">kaito</option>
-      <option value="sakura">sakura</option><option value="souta" selected>souta — default</option><option value="nanami">nanami</option>
-      <option value="haruto">haruto</option><option value="mei">mei</option><option value="yuto">yuto</option>
-      <option value="rina">rina</option><option value="ren">ren</option><option value="hajun">hajun</option>
-    </select>
-    <audio id="talkPlayer" controls style="width:100%; margin-top:12px; display:none"></audio>
-    <div class="result" id="talkOut" style="min-height:40px; margin-top:12px"><span class="meta">Your conversation will appear here.</span></div>
-  </div>
 </div>
 
 <script>
-// ---------- STT: capture mic as 16-bit PCM mono WAV (Atlas-accepted) ----------
-let recording = false, audioCtx, stream, procNode, srcNode, buffers = [], sr = 16000;
-let recTimer = null, recElapsed = 0;
-const MAX_SECONDS = 90;   // 1:30 cap
-const recBtn = document.getElementById('recBtn');
-const recStatus = document.getElementById('recStatus');
-const sttOut = document.getElementById('sttOut');
-
-recBtn.onclick = async () => {
-  if (!recording) { await startRec(); } else { await stopRec(); }
-};
-
-async function startRec() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  } catch (e) { sttOut.innerHTML = '<span class="err">Microphone blocked: '+e.message+'</span>'; return; }
-  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  sr = audioCtx.sampleRate;
-  srcNode = audioCtx.createMediaStreamSource(stream);
-  procNode = audioCtx.createScriptProcessor(4096, 1, 1);
-  buffers = [];
-  procNode.onaudioprocess = e => buffers.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-  srcNode.connect(procNode); procNode.connect(audioCtx.destination);
-  recording = true;
-  recBtn.textContent = 'Stop & transcribe'; recBtn.classList.add('rec');
-  recElapsed = 0;
-  const fmt = s => (Math.floor(s/60))+':'+String(s%60).padStart(2,'0');
-  const paint = () => { recStatus.innerHTML = '<span class="dot"></span>recording '+fmt(recElapsed)+' / '+fmt(MAX_SECONDS); };
-  paint();
-  recTimer = setInterval(() => {
-    recElapsed++; paint();
-    if (recElapsed >= MAX_SECONDS) { stopRec(); }   // auto-stop at 1:30
-  }, 1000);
-}
-
-async function stopRec() {
-  if (!recording) return;          // guard: timer + click can both fire
-  recording = false;
-  if (recTimer) { clearInterval(recTimer); recTimer = null; }
-  procNode.disconnect(); srcNode.disconnect();
-  stream.getTracks().forEach(t => t.stop());
-  await audioCtx.close();
-  recBtn.textContent = 'Start recording'; recBtn.classList.remove('rec');
-  recStatus.textContent = 'uploading…';
-
-  const wav = encodeWav(flatten(buffers), sr);
-  const fd = new FormData();
-  fd.append('file', new Blob([wav], {type:'audio/wav'}), 'mic.wav');
-  fd.append('language', document.getElementById('lang').value);
-  fd.append('prompt', document.getElementById('prompt').value);
-
-  try {
-    const r = await fetch('/api/stt', { method:'POST', body: fd });
-    const j = await r.json();
-    recStatus.textContent = '';
-    if (j.ok) {
-      sttOut.innerHTML = '<div class="heard">“'+ (j.text||'').trim() +'”</div>' +
-        '<div class="meta">status '+j.status+' · '+(j.elapsed_ms||'?')+' ms</div>';
-    } else {
-      sttOut.innerHTML = '<span class="err">Error '+(j.status||'')+': '+(j.detail||j.error||'failed')+'</span>';
-    }
-  } catch (e) { recStatus.textContent=''; sttOut.innerHTML = '<span class="err">'+e.message+'</span>'; }
-}
-
-function flatten(bufs){ let len=0; bufs.forEach(b=>len+=b.length); const out=new Float32Array(len); let o=0;
-  bufs.forEach(b=>{ out.set(b,o); o+=b.length; }); return out; }
-
-function encodeWav(samples, rate){
-  const buf = new ArrayBuffer(44 + samples.length*2); const v = new DataView(buf);
-  const ws=(off,s)=>{ for(let i=0;i<s.length;i++) v.setUint8(off+i, s.charCodeAt(i)); };
-  ws(0,'RIFF'); v.setUint32(4,36+samples.length*2,true); ws(8,'WAVE'); ws(12,'fmt ');
-  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
-  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true);
-  v.setUint16(34,16,true); ws(36,'data'); v.setUint32(40,samples.length*2,true);
-  let off=44; for(let i=0;i<samples.length;i++){ let s=Math.max(-1,Math.min(1,samples[i]));
-    v.setInt16(off, s<0 ? s*0x8000 : s*0x7FFF, true); off+=2; }
-  return buf;
-}
-
 // ---------- TTS ----------
 const speakBtn = document.getElementById('speakBtn');
 const ttsStatus = document.getElementById('ttsStatus');
@@ -433,64 +321,6 @@ function b64(buf) {
   return btoa(s);
 }
 
-// ---------- Day-2: Talk to Atlas (speech -> STT -> LLM -> TTS -> speech) ----------
-let talkRec = false, talkCtx, talkStream, talkProc, talkSrc, talkBufs = [], talkSr = 16000;
-const talkBtn = document.getElementById('talkBtn');
-const talkStatus = document.getElementById('talkStatus');
-const talkOut = document.getElementById('talkOut');
-const talkPlayer = document.getElementById('talkPlayer');
-
-talkBtn.onclick = async () => { talkRec ? await talkStopSend() : await talkStart(); };
-
-async function talkStart() {
-  try { talkStream = await navigator.mediaDevices.getUserMedia({ audio: true }); }
-  catch (e) { talkOut.innerHTML = '<span class="err">Microphone blocked: '+e.message+'</span>'; return; }
-  talkCtx = new (window.AudioContext || window.webkitAudioContext)();
-  talkSr = talkCtx.sampleRate;
-  talkSrc = talkCtx.createMediaStreamSource(talkStream);
-  talkProc = talkCtx.createScriptProcessor(4096, 1, 1);
-  talkBufs = [];
-  talkProc.onaudioprocess = e => talkBufs.push(new Float32Array(e.inputBuffer.getChannelData(0)));
-  talkSrc.connect(talkProc); talkProc.connect(talkCtx.destination);
-  talkRec = true;
-  talkBtn.textContent = 'Stop & send'; talkBtn.classList.add('rec');
-  talkStatus.innerHTML = '<span class="dot"></span>listening…';
-}
-
-async function talkStopSend() {
-  talkRec = false;
-  try { talkProc.disconnect(); talkSrc.disconnect(); talkStream.getTracks().forEach(t=>t.stop()); await talkCtx.close(); } catch {}
-  talkBtn.textContent = 'Start talking'; talkBtn.classList.remove('rec');
-  talkStatus.textContent = 'thinking…';
-
-  const wav = encodeWav(flatten(talkBufs), talkSr);
-  const fd = new FormData();
-  fd.append('file', new Blob([wav], {type:'audio/wav'}), 'talk.wav');
-  fd.append('language', document.getElementById('talkLang').value);
-  fd.append('voice', document.getElementById('talkVoice').value);
-
-  try {
-    const r = await fetch('/api/talk', { method:'POST', body: fd });
-    const j = await r.json();
-    talkStatus.textContent = '';
-    if (!j.ok) {
-      const where = j.stage ? (' ['+j.stage+']') : '';
-      talkOut.innerHTML = '<span class="err">Error'+where+': '+escapeHtml(j.error||('HTTP '+r.status))+'</span>'
-        + (j.heard ? '<div class="meta" style="margin-top:6px">heard: "'+escapeHtml(j.heard)+'"</div>' : '');
-      return;
-    }
-    // play the spoken reply
-    const bytes = atob(j.audio_b64); const arr = new Uint8Array(bytes.length);
-    for (let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
-    talkPlayer.src = URL.createObjectURL(new Blob([arr], {type:'audio/wav'}));
-    talkPlayer.style.display='block'; talkPlayer.play();
-    const t = j.timings || {};
-    talkOut.innerHTML =
-      '<div style="margin-bottom:6px"><span class="meta">You said:</span> '+escapeHtml(j.heard)+'</div>'
-      + '<div><span class="meta">Atlas replied:</span> <b>'+escapeHtml(j.reply)+'</b></div>'
-      + '<div class="meta" style="margin-top:8px; font-size:12px">STT '+(t.stt_ms||'?')+'ms · LLM '+(t.llm_ms||'?')+'ms · TTS first-audio '+(t.tts_first_audio_ms||'?')+'ms · '+escapeHtml(j.model||'')+'</div>';
-  } catch (e) { talkStatus.textContent=''; talkOut.innerHTML = '<span class="err">'+escapeHtml(e.message)+'</span>'; }
-}
 </script>
 </body>
 </html>"""
