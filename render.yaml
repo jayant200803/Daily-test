@@ -1,0 +1,19 @@
+# Render deploy config for the Atlas live web demo (webapp.py).
+# On Render this gives you automatic HTTPS, so the browser mic works for the team.
+#
+# Deploy steps (do these on render.com after pushing to GitHub):
+#   1. New +  ->  Web Service  ->  connect this GitHub repo.
+#   2. Render auto-detects this render.yaml (or set the fields below manually).
+#   3. Add an environment variable  ATLAS_API_KEY  = your test key.
+#      (Do NOT commit the key; .env is gitignored. Set it in Render's dashboard.)
+#   4. Create Web Service. Render builds, then gives you an https://…onrender.com URL.
+services:
+  - type: web
+    name: atlas-live-demo
+    runtime: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt -r requirements-demo.txt gunicorn"
+    startCommand: "gunicorn webapp:app --bind 0.0.0.0:$PORT"
+    envVars:
+      - key: ATLAS_API_KEY
+        sync: false   # set this secret in the Render dashboard, not in the repo

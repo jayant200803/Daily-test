@@ -1,0 +1,9 @@
+# Extra deps for the LIVE demos only. The QA harness (run_day1.py) stays
+# stdlib-only and does NOT need any of these.
+
+# For the terminal live demo (live_demo.py): records the local mic.
+sounddevice>=0.4
+numpy>=1.24
+
+# For the browser web demo (webapp.py): team opens a URL and speaks.
+flask>=3.0

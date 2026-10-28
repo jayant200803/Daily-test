@@ -1,0 +1,16 @@
+{
+  "_comment": "Add your real clips to audio_in/ and list them here. expected = the correct words (for accuracy scoring). prompt = real terms to bias (Listen Audio&Languages > Vocabulary).",
+  "accuracy": [
+    {"file": "english_terms.wav", "language": "en",
+     "expected": "I would like to change my booking reference NS7K2Q to the later flight",
+     "prompt": "booking reference, NS7K2Q, itinerary, boarding pass"}
+  ],
+  "accents": [
+    {"file": "accent_indian.wav",   "language": "en", "expected": "please confirm my seat and baggage allowance"},
+    {"file": "accent_american.wav", "language": "en", "expected": "please confirm my seat and baggage allowance"}
+  ],
+  "phone": [
+    {"file": "call_clip.wav", "language": "en",
+     "expected": "thank you for calling how can I help you today"}
+  ]
+}
