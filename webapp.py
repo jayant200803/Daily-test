@@ -82,8 +82,21 @@ PAGE = """<!doctype html>
     <h2>⌨️ Type &rarr; atlas-speak (TTS)</h2>
     <label>Text to speak</label>
     <textarea id="ttsText">Thank you for calling. How may I help you with your booking today?</textarea>
-    <label>Voice</label>
-    <input type="text" id="voice" value="__VOICE__">
+    <label>Voice (12 Japanese voices per the docs; default souta)</label>
+    <select id="voice">
+      <option value="ayaka">ayaka (あやか)</option>
+      <option value="emi">emi (えみ)</option>
+      <option value="kaito">kaito (かいと)</option>
+      <option value="sakura">sakura (さくら)</option>
+      <option value="souta" selected>souta (そうた) — default</option>
+      <option value="nanami">nanami (ななみ)</option>
+      <option value="haruto">haruto (はると)</option>
+      <option value="mei">mei (めい)</option>
+      <option value="yuto">yuto (ゆうと)</option>
+      <option value="rina">rina (りな)</option>
+      <option value="ren">ren (れん)</option>
+      <option value="hajun">hajun (ハジュン)</option>
+    </select>
     <div class="row" style="margin-top:12px">
       <button id="speakBtn">Speak it</button>
       <span id="ttsStatus" class="meta"></span>

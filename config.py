@@ -5,6 +5,10 @@ SPEAK_MODEL  = "atlas-speak"
 
 # --- Speak (TTS) test inputs (defaults; edit freely) ---
 SPEAK_VOICE = "souta"                      # default voice per docs
+# The 12 Japanese voices atlas-speak offers (Speak > Voices). Set SPEAK_VOICE above
+# to any of these. English text is spoken with a Japanese voice (per docs).
+SPEAK_VOICES = ["ayaka", "emi", "kaito", "sakura", "souta", "nanami",
+                "haruto", "mei", "yuto", "rina", "ren", "hajun"]
 ENGLISH_TEXTS = [
     "Thank you for calling. How may I help you with your booking today?",
     "Your flight has been changed to NS1156 at 20:30, and you are saving 60 euros.",
