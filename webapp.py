@@ -890,18 +890,24 @@ def api_respond():
     if not text and not history:
         return jsonify(ok=False, error="no text"), 400
     # history (full conversation incl. latest user turn) gives the model memory.
+    llm_started = time.time()
     if isinstance(history, list) and history:
         chat = llm.chat(system=ASSISTANT_SYSTEM, history=history[-16:])
     else:
         chat = llm.chat(text, system=ASSISTANT_SYSTEM)
+    llm_ended = time.time()
     reply = (chat.get("text") or "").strip()
     if chat.get("status") != 200 or not reply:
         g._detail = f"RESPOND llm_fail status={chat.get('status')}"
         return jsonify(ok=False, stage="llm", status=chat.get("status"),
                        error=chat.get("error") or "LLM returned no text"), 502
-    g._detail = f"RESPOND ok reply={len(reply)}c llm={chat.get('elapsed_ms')}ms"
+    import datetime as _dt
+    iso = lambda t: _dt.datetime.utcfromtimestamp(t).strftime("%H:%M:%S.%f")[:-3] + "Z"
+    g._detail = (f"RESPOND ok reply={len(reply)}c llm={chat.get('elapsed_ms')}ms "
+                 f"llm_start={iso(llm_started)} llm_end={iso(llm_ended)}")
     return jsonify(ok=True, reply=reply, model=LLM_MODEL,
-                   timings={"llm_ms": chat.get("elapsed_ms")})
+                   timings={"llm_ms": chat.get("elapsed_ms"),
+                            "llm_started": iso(llm_started), "llm_ended": iso(llm_ended)})
 
 
 def _clean_tts_text(s):
