@@ -93,6 +93,7 @@ PAGE = """<!doctype html>
 <div class="wrap">
   <h1>Atlas Live Test</h1>
   <p class="sub">Speak to test <b>atlas-listen</b> (STT). Type to test <b>atlas-speak</b> (TTS). Endpoints are exactly per the Atlas docs; nothing is scored.</p>
+  <p class="sub" style="margin-top:-12px"><a href="/pipeline" style="color:#2f81f7">→ Open the Speech-to-Speech pipeline page (live transcription + latency + spoken reply)</a></p>
 
   <div class="card">
     <h2>🎙️ Speak &rarr; atlas-listen (STT)</h2>
@@ -495,6 +496,173 @@ async function talkStopSend() {
 </html>"""
 
 
+PIPELINE_PAGE = """<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas Speech-to-Speech</title>
+<style>
+  :root { --bg:#0f1419; --card:#1a222c; --fg:#e6edf3; --muted:#8b98a5;
+          --accent:#2f81f7; --ok:#2ea043; --rec:#e5534b; --border:#30363d; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.5 system-ui,Segoe UI,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  a { color:var(--accent); text-decoration:none; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--muted); margin:0 0 20px; font-size:14px; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; }
+  .card h2 { font-size:16px; margin:0 0 12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:12px 0 4px; }
+  select { width:100%; background:#0d1117; color:var(--fg); border:1px solid var(--border); border-radius:8px; padding:9px 11px; font:inherit; }
+  button { cursor:pointer; border:0; border-radius:8px; padding:11px 20px; font:inherit; font-weight:600; color:#fff; background:var(--accent); }
+  button.rec { background:var(--rec); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .result { margin-top:14px; padding:12px 14px; border-radius:8px; background:#0d1117; border:1px solid var(--border); min-height:20px; white-space:pre-wrap; }
+  .err { color:var(--rec); }
+  .meta { color:var(--muted); font-size:13px; }
+  .dot { width:10px; height:10px; border-radius:50%; background:var(--rec); display:inline-block; margin-right:6px; animation:p 1s infinite; }
+  @keyframes p { 50% { opacity:.3; } }
+  .lat { display:flex; gap:10px; flex-wrap:wrap; margin-top:12px; }
+  .chip { background:#0d1117; border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:13px; }
+  .chip b { font-size:18px; color:var(--fg); display:block; }
+  .chip span { color:var(--muted); font-size:11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Atlas Speech-to-Speech Pipeline</h1>
+  <p class="sub">Live transcription with latency, then a spoken reply. <a href="/">&larr; back to test console</a></p>
+
+  <div class="card">
+    <h2>🗣️ Converse</h2>
+    <p class="meta" style="margin:0 0 12px">Click start, speak, then <b>Stop &amp; get reply</b>. You speak &rarr; <b>atlas-listen</b> (live STT) &rarr; <b>LLM</b> &rarr; <b>atlas-speak</b> (TTS) &rarr; you hear the answer.</p>
+    <div class="row">
+      <button id="pBtn">Start</button>
+      <span id="pStatus" class="meta"></span>
+    </div>
+    <label>Language (your speech)</label>
+    <select id="pLang"><option value="en" selected>en (English)</option><option value="ja">ja (Japanese)</option></select>
+    <label>Reply voice</label>
+    <select id="pVoice">
+      <option value="ayaka">ayaka</option><option value="emi">emi</option><option value="kaito">kaito</option>
+      <option value="sakura">sakura</option><option value="souta" selected>souta — default</option><option value="nanami">nanami</option>
+      <option value="haruto">haruto</option><option value="mei">mei</option><option value="yuto">yuto</option>
+      <option value="rina">rina</option><option value="ren">ren</option><option value="hajun">hajun</option>
+    </select>
+  </div>
+
+  <div class="card">
+    <h2>📝 Live transcription (your speech)</h2>
+    <div class="result" id="pOut" style="min-height:48px"><span class="meta">Your words stream here, each phrase with ttfp / eot latency.</span></div>
+  </div>
+
+  <div class="card">
+    <h2>🔊 Atlas reply</h2>
+    <audio id="pPlayer" controls style="width:100%; display:none; margin-bottom:10px"></audio>
+    <div class="result" id="pReply"><span class="meta">The spoken reply and pipeline latency will appear here.</span></div>
+    <div class="lat" id="pLat"></div>
+  </div>
+</div>
+
+<script>
+let ws=null, ctx=null, stream=null, proc=null, src=null, on=false;
+let audioEpoch=0, committed=[], curLine='', interimActive=false;
+let uAudioStart=0, uFirst=null, uTTFP=null, uAudioEnd=null;
+let tStop=0;
+const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
+const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
+const pLat=document.getElementById('pLat'), pPlayer=document.getElementById('pPlayer');
+
+const esc = s => s.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+pBtn.onclick = () => { on ? stopAndRespond() : start(); };
+
+function render() {
+  const lines = committed.map(o => {
+    const tags=[]; if(o.ttfp!=null) tags.push('ttfp '+o.ttfp+'ms'); if(o.eot!=null) tags.push('eot '+o.eot+'ms');
+    const t = tags.length ? ' <span style="color:var(--muted);font-size:12px">· '+tags.join(' · ')+'</span>' : '';
+    return '<div><span style="color:var(--fg)">'+esc(o.text)+'</span>'+t+'</div>';
+  }).join('');
+  const cur = curLine ? '<div><span style="color:var(--muted)">'+esc(curLine)+'</span></div>' : '';
+  pOut.innerHTML = (lines||cur) ? (lines+cur) : '<span class="meta">Listening…</span>';
+}
+function markFirst(txt){ if(uFirst===null && txt && txt.trim()){ uFirst=performance.now(); uTTFP=Math.max(0,Math.round(uFirst-(audioEpoch+uAudioStart))); pStatus.innerHTML='<span class="dot"></span>live · ttfp '+uTTFP+'ms'; } }
+
+async function start() {
+  committed=[]; curLine=''; interimActive=false; audioEpoch=0; uAudioStart=0; uFirst=null; uTTFP=null; uAudioEnd=null;
+  pReply.innerHTML='<span class="meta">…</span>'; pLat.innerHTML=''; pPlayer.style.display='none';
+  pOut.innerHTML='<span class="meta">connecting…</span>';
+  let key;
+  try { const kr=await fetch('/api/rtkey'); const kj=await kr.json(); if(!kj.ok) throw new Error(kj.error||'no key'); key=kj.key; }
+  catch(e){ pOut.innerHTML='<span class="err">Cannot get key: '+e.message+'</span>'; return; }
+  try { stream=await navigator.mediaDevices.getUserMedia({audio:true}); ctx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000}); }
+  catch(e){ pOut.innerHTML='<span class="err">Microphone blocked: '+e.message+'</span>'; return; }
+  const rate=ctx.sampleRate;
+  ws=new WebSocket('wss://atlas.oneinbox.ai/v1/realtime?intent=transcription', ['realtime','openai-insecure-api-key.'+key]);
+  ws.onopen=()=>{
+    ws.send(JSON.stringify({type:'session.update',session:{type:'transcription',audio:{input:{
+      format:{type:'audio/pcm',rate:rate},
+      transcription:{model:'atlas-listen',language:document.getElementById('pLang').value,prompt:undefined},
+      turn_detection:{type:'server_vad',silence_duration_ms:500}}},atlas:{interim:true}}}));
+    src=ctx.createMediaStreamSource(stream); proc=ctx.createScriptProcessor(4096,1,1);
+    proc.onaudioprocess=e=>{ if(!on||ws.readyState!==1) return; const f=e.inputBuffer.getChannelData(0); const i=new Int16Array(f.length);
+      for(let k=0;k<f.length;k++){let s=Math.max(-1,Math.min(1,f[k]));i[k]=s<0?s*0x8000:s*0x7FFF;} ws.send(JSON.stringify({type:'input_audio_buffer.append',audio:b64(i.buffer)})); };
+    src.connect(proc); proc.connect(ctx.destination); audioEpoch=performance.now(); on=true;
+    pBtn.textContent='Stop & get reply'; pBtn.classList.add('rec'); pStatus.innerHTML='<span class="dot"></span>live'; render();
+  };
+  ws.onmessage=ev=>{ let m; try{m=JSON.parse(ev.data);}catch{return;}
+    switch(m.type){
+      case 'input_audio_buffer.speech_started': uAudioStart=(m.audio_start_ms!=null)?m.audio_start_ms:Math.round(performance.now()-audioEpoch); uFirst=null; uTTFP=null; uAudioEnd=null; curLine=''; interimActive=false; render(); break;
+      case 'conversation.item.input_audio_transcription.interim': interimActive=true; markFirst(m.text); curLine=m.text||''; render(); break;
+      case 'conversation.item.input_audio_transcription.delta': markFirst(m.delta); if(!interimActive){curLine+=(m.delta||'');render();} break;
+      case 'input_audio_buffer.speech_stopped': uAudioEnd=(m.audio_end_ms!=null)?m.audio_end_ms:Math.round(performance.now()-audioEpoch); break;
+      case 'conversation.item.input_audio_transcription.completed': { const eot=(uAudioEnd!=null)?Math.max(0,Math.round(performance.now()-(audioEpoch+uAudioEnd))):null;
+        if(m.transcript) committed.push({text:m.transcript,ttfp:uTTFP,eot:eot}); curLine=''; interimActive=false; uFirst=null; uTTFP=null; uAudioEnd=null; render(); break; }
+      case 'error': pStatus.textContent=''; pOut.innerHTML='<span class="err">Atlas error: '+((m.error&&(m.error.message||m.error.code))||'unknown')+'</span>'; hardStop(); break;
+    }
+  };
+  ws.onerror=()=>{ if(on) pOut.innerHTML='<span class="err">WebSocket error (check key / network)</span>'; };
+}
+
+function hardStop() {
+  on=false;
+  try{if(proc)proc.disconnect();}catch{} try{if(src)src.disconnect();}catch{}
+  try{if(stream)stream.getTracks().forEach(t=>t.stop());}catch{} try{if(ctx)ctx.close();}catch{}
+  try{if(ws&&ws.readyState===1)ws.close();}catch{}
+  pBtn.textContent='Start'; pBtn.classList.remove('rec'); pStatus.textContent='';
+}
+
+async function stopAndRespond() {
+  tStop=performance.now();            // ~ when the user stopped speaking (for voice-to-voice)
+  hardStop();
+  const transcript=(committed.map(o=>o.text).join(' ')+(curLine?(' '+curLine):'')).trim();
+  if(!transcript){ pReply.innerHTML='<span class="err">Didn\\'t catch anything — try again.</span>'; return; }
+  pStatus.textContent='thinking…'; pReply.innerHTML='<span class="meta">LLM + TTS…</span>';
+  try {
+    const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({text:transcript, voice:document.getElementById('pVoice').value})});
+    const j=await r.json(); pStatus.textContent='';
+    if(!j.ok){ pReply.innerHTML='<span class="err">Error'+(j.stage?(' ['+j.stage+']'):'')+': '+esc(j.error||('HTTP '+r.status))+'</span>'; return; }
+    const bytes=atob(j.audio_b64); const a=new Uint8Array(bytes.length); for(let i=0;i<bytes.length;i++)a[i]=bytes.charCodeAt(i);
+    pPlayer.src=URL.createObjectURL(new Blob([a],{type:'audio/wav'})); pPlayer.style.display='block';
+    const e2e=Math.round(performance.now()-tStop);   // voice-to-voice: stop speaking -> reply ready to play
+    pPlayer.play();
+    const t=j.timings||{};
+    pReply.innerHTML='<div class="meta">You said:</div><div style="margin-bottom:8px">'+esc(transcript)+'</div>'
+      +'<div class="meta">Atlas replied:</div><div><b>'+esc(j.reply)+'</b></div>';
+    pLat.innerHTML =
+      chip(e2e,'End-to-end','stop speaking → reply')
+      + chip(t.llm_ms,'LLM', esc(j.model||''))
+      + chip(t.tts_first_audio_ms,'TTS first audio','atlas-speak');
+  } catch(e){ pStatus.textContent=''; pReply.innerHTML='<span class="err">'+esc(e.message)+'</span>'; }
+}
+function chip(v,label,sub){ return '<div class="chip"><b>'+(v!=null?v+'ms':'—')+'</b>'+esc(label)+'<br><span>'+sub+'</span></div>'; }
+function b64(buf){ const b=new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+</script>
+</body>
+</html>"""
+
+
 def _key_missing():
     """Return a JSON 500 if the server has no Atlas key, else None."""
     if not os.environ.get("ATLAS_API_KEY"):
@@ -515,6 +683,11 @@ def _json_errors(e):
 @app.get("/")
 def index():
     return render_template_string(PAGE.replace("__VOICE__", SPEAK_VOICE))
+
+
+@app.get("/pipeline")
+def pipeline():
+    return render_template_string(PIPELINE_PAGE)
 
 
 @app.get("/api/rtkey")
@@ -664,6 +837,49 @@ def api_talk():
         for p in (tmp_in.name, tmp_out.name):
             try: os.unlink(p)
             except OSError: pass
+
+
+@app.post("/api/respond")
+def api_respond():
+    """LLM + TTS from already-transcribed text (used by the /pipeline page, which
+    gets the transcript live over the streaming WebSocket, so STT is already done)."""
+    if not os.environ.get(LLM_KEY_ENV):
+        return jsonify(ok=False, stage="llm", error=f"{LLM_KEY_ENV} is not set on the server."), 500
+    missing = _key_missing()
+    if missing:
+        return missing
+    data = request.get_json(silent=True) or {}
+    text = (data.get("text") or "").strip()
+    if not text:
+        return jsonify(ok=False, error="no text"), 400
+    voice = (data.get("voice") or SPEAK_VOICE).strip()
+
+    chat = llm.chat(text, system=ASSISTANT_SYSTEM)
+    reply = (chat.get("text") or "").strip()
+    if chat.get("status") != 200 or not reply:
+        g._detail = f"RESPOND llm_fail status={chat.get('status')}"
+        return jsonify(ok=False, stage="llm", status=chat.get("status"),
+                       error=chat.get("error") or "LLM returned no text"), 502
+
+    tmp_out = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+    tmp_out.close()
+    try:
+        tts = atlas.synthesize(reply, voice=voice, out_path=tmp_out.name, response_format="wav")
+        if tts.get("status") != 200 or not tts.get("bytes"):
+            g._detail = f"RESPOND tts_fail status={tts.get('status')}"
+            return jsonify(ok=False, stage="tts", status=tts.get("status"),
+                           error=f"atlas-speak returned {tts.get('status')}", reply=reply), 502
+        with open(tmp_out.name, "rb") as fh:
+            audio_b64 = base64.b64encode(fh.read()).decode("ascii")
+        g._detail = (f"RESPOND ok reply={len(reply)}c llm={chat.get('elapsed_ms')}ms "
+                     f"tts_first={tts.get('first_audio_header_ms')}ms voice={voice}")
+        return jsonify(ok=True, reply=reply, audio_b64=audio_b64, model=LLM_MODEL, voice=voice,
+                       timings={"llm_ms": chat.get("elapsed_ms"),
+                                "tts_first_audio_ms": tts.get("first_audio_header_ms"),
+                                "tts_total_ms": tts.get("total_ms")})
+    finally:
+        try: os.unlink(tmp_out.name)
+        except OSError: pass
 
 
 @app.get("/api/talk/health")
