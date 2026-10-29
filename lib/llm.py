@@ -101,20 +101,29 @@ def chat(user_text=None, system=None, model=None, history=None):
         "model": model or LLM_MODEL,
         "messages": messages,
         "temperature": 0.4,
-        "max_tokens": 500,       # room for reasoning + a short reply, while saving TPM
+        "max_tokens": 600,       # room for reasoning + a short reply, while saving TPM
         "reasoning_effort": "low",
         "stream": True,          # stream so we can measure Time To First Token (TTFT)
     }
-    out = _stream_once(key, body)
 
-    # Friendly handling for the free-tier token-per-minute limit (don't surface raw error).
-    err = (out.get("error") or "")
-    if out.get("status") == 429 or "rate limit" in err.lower() or "tokens per minute" in err.lower():
+    def _is_rate_limit(o):
+        e = (o.get("error") or "").lower()
+        return o.get("status") == 429 or "rate limit" in e or "tokens per minute" in e
+
+    out = _stream_once(key, body)
+    if _is_rate_limit(out):
         return {"status": 429, "error": "The assistant is briefly busy (rate limit). Please try again in a few seconds."}
 
-    # If reasoning ate the budget and content is empty, don't hard-fail: give a safe line.
+    # Empty content (reasoning ate the budget) -> one retry with a bigger budget, unless
+    # that retry is rate-limited. Only then fall back to a safe line.
     if out.get("status") == 200 and not (out.get("text") or "").strip():
-        out["text"] = "I'm sorry, could you please say that again?"
+        retry = _stream_once(key, {**body, "max_tokens": 900})
+        if _is_rate_limit(retry):
+            return {"status": 429, "error": "The assistant is briefly busy (rate limit). Please try again in a few seconds."}
+        if retry.get("status") == 200 and (retry.get("text") or "").strip():
+            out = retry
+        else:
+            out["text"] = "I'm sorry, could you please say that again?"
     if out.get("status") == 200:
         out["text"] = _clean_reply(out.get("text", ""))
     return out
