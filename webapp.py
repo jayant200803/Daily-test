@@ -689,7 +689,7 @@ recBtn.onclick=async()=>{ recing ? await stopRec() : await startRec(); };
 async function startRec(){
  try{ mstream=await navigator.mediaDevices.getUserMedia({audio:true}); }
  catch(e){ liveOut.innerHTML='<p class="err">Microphone blocked: '+e.message+'</p>'; return; }
- actx=new (window.AudioContext||window.webkitAudioContext)(); sr=actx.sampleRate;
+ actx=new (window.AudioContext||window.webkitAudioContext)({sampleRate:16000}); sr=actx.sampleRate;
  src=actx.createMediaStreamSource(mstream); proc=actx.createScriptProcessor(4096,1,1); bufs=[];
  proc.onaudioprocess=e=>bufs.push(new Float32Array(e.inputBuffer.getChannelData(0)));
  src.connect(proc); proc.connect(actx.destination); recing=true;
