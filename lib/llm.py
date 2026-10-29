@@ -38,37 +38,8 @@ def _clean_reply(text):
     return " ".join(out).strip() or text
 
 
-def chat(user_text=None, system=None, model=None, history=None):
-    """history: optional list of prior turns [{role:'user'|'assistant', content:str}, ...]
-    ending with the latest user turn. If given, it is used instead of user_text so the
-    model has the full conversation context (prevents re-asking for known details)."""
-    key = os.environ.get(LLM_KEY_ENV)
-    if not key:
-        return {"status": None, "error": f"{LLM_KEY_ENV} not set on the server"}
-    messages = []
-    if system:
-        messages.append({"role": "system", "content": system})
-    if history:
-        for m in history:
-            role = "assistant" if m.get("role") == "assistant" else "user"
-            content = (m.get("content") or "").strip()
-            if content:
-                messages.append({"role": role, "content": content})
-    elif user_text:
-        messages.append({"role": "user", "content": user_text})
-    body = {
-        "model": model or LLM_MODEL,
-        "messages": messages,
-        "temperature": 0.4,
-        # Enough room for this reasoning model to think AND emit the reply (too low
-        # starves 'content' -> empty text). Reply length is controlled by the prompt,
-        # not this cap, so a larger value does NOT make the spoken reply longer.
-        "max_tokens": 256,
-        # gpt-oss on Groq is a reasoning model; keep reasoning minimal so the
-        # spoken reply comes back fast and 'content' isn't eaten by reasoning tokens.
-        "reasoning_effort": "low",
-        "stream": True,          # stream so we can measure Time To First Token (TTFT)
-    }
+def _stream_once(key, body):
+    """One streamed chat call. Returns {status, ttft_ms, elapsed_ms, text} or {status, error}."""
     t0 = time.time()
     ttft_ms = None
     parts = []
@@ -102,4 +73,46 @@ def chat(user_text=None, system=None, model=None, history=None):
     except requests.RequestException as e:
         return {"status": None, "error": f"request failed: {e}"}
     return {"status": 200, "elapsed_ms": int((time.time() - t0) * 1000),
-            "ttft_ms": ttft_ms, "text": _clean_reply("".join(parts))}
+            "ttft_ms": ttft_ms, "text": "".join(parts)}
+
+
+def chat(user_text=None, system=None, model=None, history=None):
+    """history: optional list of prior turns [{role:'user'|'assistant', content:str}, ...]
+    ending with the latest user turn. If given, it is used instead of user_text so the
+    model has the full conversation context (prevents re-asking for known details)."""
+    key = os.environ.get(LLM_KEY_ENV)
+    if not key:
+        return {"status": None, "error": f"{LLM_KEY_ENV} not set on the server"}
+    messages = []
+    if system:
+        messages.append({"role": "system", "content": system})
+    if history:
+        for m in history:
+            role = "assistant" if m.get("role") == "assistant" else "user"
+            content = (m.get("content") or "").strip()
+            if content:
+                messages.append({"role": role, "content": content})
+    elif user_text:
+        messages.append({"role": "user", "content": user_text})
+    # gpt-oss is a reasoning model: it spends tokens "thinking" before the reply, so the
+    # cap must cover reasoning + content (too low -> empty 'content'). The cap does NOT
+    # lengthen the spoken reply (the prompt + _clean_reply control that).
+    body = {
+        "model": model or LLM_MODEL,
+        "messages": messages,
+        "temperature": 0.4,
+        "max_tokens": 512,
+        "reasoning_effort": "low",
+        "stream": True,          # stream so we can measure Time To First Token (TTFT)
+    }
+    out = _stream_once(key, body)
+    # Safety: if the model burned its budget on reasoning and returned empty content,
+    # retry once with a bigger budget so the caller never gets an empty reply.
+    if out.get("status") == 200 and not (out.get("text") or "").strip():
+        body2 = dict(body); body2["max_tokens"] = 1024
+        retry = _stream_once(key, body2)
+        if retry.get("status") == 200 and (retry.get("text") or "").strip():
+            out = retry
+    if out.get("status") == 200:
+        out["text"] = _clean_reply(out.get("text", ""))
+    return out
