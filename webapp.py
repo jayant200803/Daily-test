@@ -112,7 +112,7 @@ PAGE = """<!doctype html>
   <div class="card">
     <h2>⌨️ Type &rarr; atlas-speak (TTS)</h2>
     <label>Text to speak</label>
-    <textarea id="ttsText">Hello, thank you for calling Manulife Finance. This is Louis, a virtual assistant. How may I help you today?</textarea>
+    <textarea id="ttsText">お電話ありがとうございます。マニュライフ・ファイナンスのバーチャルアシスタント、ルイと申します。本日はどのようなご用件でしょうか？</textarea>
     <label>Voice (12 Japanese voices per the docs; default souta)</label>
     <select id="voice">
       <option value="ayaka">ayaka (あやか)</option>
@@ -372,7 +372,7 @@ PIPELINE_PAGE = """<!doctype html>
       <span id="pStatus" class="meta"></span>
     </div>
     <label>Language (your speech)</label>
-    <select id="pLang"><option value="en" selected>en (English)</option><option value="ja">ja (Japanese)</option></select>
+    <select id="pLang"><option value="ja" selected>ja (Japanese)</option><option value="en">en (English)</option></select>
     <label>Reply voice</label>
     <select id="pVoice">
       <option value="ayaka">ayaka</option><option value="emi">emi</option><option value="kaito">kaito</option>
