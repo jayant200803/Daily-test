@@ -112,7 +112,7 @@ PAGE = """<!doctype html>
   <div class="card">
     <h2>⌨️ Type &rarr; atlas-speak (TTS)</h2>
     <label>Text to speak</label>
-    <textarea id="ttsText">Thank you for calling the bank. How can I help you with your account today?</textarea>
+    <textarea id="ttsText">Hello, thank you for calling Manulife Finance. This is Louis, a virtual assistant. How may I help you today?</textarea>
     <label>Voice (12 Japanese voices per the docs; default souta)</label>
     <select id="voice">
       <option value="ayaka">ayaka (あやか)</option>

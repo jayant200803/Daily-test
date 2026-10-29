@@ -33,7 +33,7 @@ def _clean_reply(text):
             continue
         seen.add(key)
         out.append(s)
-        if s.endswith('?') or len(out) >= 2:     # one question max / 2 sentences max
+        if s.endswith('?') or len(out) >= 3:     # stop after the first question; max 3 sentences
             break
     return " ".join(out).strip() or text
 
