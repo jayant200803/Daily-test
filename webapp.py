@@ -513,25 +513,31 @@ async function finalizeTurn() {
     convo.push(entry); render();
     pReply.innerHTML='<span class="meta">Per reply: LLM TTFT (first token) + TTS TTFA (first audio).</span>';
 
-    // 2) TTS — fetch audio, read Atlas TTFA header, then play (reliable, no stall).
+    // 2) TTS — PROGRESSIVE playback (MediaSource) so you HEAR the reply at ~first audio,
+    //    matching the TTFA number. Falls back to buffered blob if MSE isn't available.
     const voice=document.getElementById('pVoice').value;
     const url='/api/speak_stream?format=mp3&voice='+encodeURIComponent(voice)+'&text='+encodeURIComponent(j.reply);
-    logLine('TTS request sent');
-    const ar=await fetch(url, {signal:AbortSignal.timeout(25000)});
-    if(!ar.ok){ const ej=await ar.json().catch(()=>({})); logLine('TTS ERROR: '+(ej.error||('HTTP '+ar.status))); pReply.innerHTML='<span class="err">TTS error: '+esc(ej.error||('HTTP '+ar.status))+'</span>'; resumeListening(); return; }
-    const ttfaHdr=ar.headers.get('X-Atlas-First-Audio-Ms');
-    const ttfa=ttfaHdr!=null?parseInt(ttfaHdr,10):null;                 // Atlas Time To First Audio
-    const blob=await ar.blob();
-    entry.lat={ttft, ttfa}; render();
-    logLine('TTS audio ready (TTFA '+(ttfa!=null?ttfa+' ms':'?')+')');
 
-    pPlayer.src=URL.createObjectURL(blob); pPlayer.style.display='block';
+    pPlayer.style.display='block';
+    let fsLogged=false;
+    pPlayer.onplaying = () => { if(!fsLogged){ fsLogged=true; logLine('FIRST SOUND 🔊 (felt '+Math.round(performance.now()-tStart)+' ms from turn end)'); } };
     pPlayer.onended = () => { logLine('audio finished'); resumeListening(); };
     pPlayer.onerror = () => { resumeListening(); };
     const wd=setTimeout(()=>{ if(replying){ resumeListening(); } }, 30000);
     pPlayer.addEventListener('ended', ()=>clearTimeout(wd), {once:true});
     pPlayer.addEventListener('error', ()=>clearTimeout(wd), {once:true});
-    pPlayer.play().catch(()=>{ clearTimeout(wd); resumeListening(); });
+
+    logLine('TTS request sent');
+    let ttfa=null;
+    try {
+      ttfa = await playReply(url);           // progressive, returns Atlas TTFA
+    } catch(err){
+      clearTimeout(wd);
+      const msg = (err&&err.ttsError) ? err.ttsError : ((err&&err.name==='TimeoutError')?'TTS timed out — try again':'TTS playback error');
+      logLine('TTS ERROR: '+msg); pReply.innerHTML='<span class="err">'+esc(msg)+'</span>'; resumeListening(); return;
+    }
+    entry.lat={ttft, ttfa}; render();
+    logLine('TTS streaming (TTFA '+(ttfa!=null?ttfa+' ms':'?')+', mode '+(window.__mseUsed?'MediaSource':'buffered')+')');
   } catch(e){
     const msg = (e && (e.name==='TimeoutError'||e.name==='AbortError')) ? 'Timed out — Atlas was slow. Please try again.' : (e && e.message) || 'error';
     pReply.innerHTML='<span class="err">'+esc(msg)+'</span>'; resumeListening();
@@ -545,6 +551,46 @@ function resumeListening(){
 
 function chip(v,label,sub){ return '<div class="chip"><b>'+(v!=null?v+'ms':'—')+'</b>'+esc(label)+'<br><span>'+sub+'</span></div>'; }
 function b64(buf){ const b=new Uint8Array(buf); let s=''; for(let i=0;i<b.length;i++) s+=String.fromCharCode(b[i]); return btoa(s); }
+
+// Fetch the TTS mp3 and play it. Uses MediaSource to start sound at the first chunk
+// (so what you HEAR matches the TTFA number). Falls back to buffered blob if MSE
+// isn't supported. Returns Atlas's TTFA (X-Atlas-First-Audio-Ms).
+async function playReply(url){
+  const resp = await fetch(url, {signal:AbortSignal.timeout(25000)});
+  if(!resp.ok){ const ej=await resp.json().catch(()=>({})); throw {ttsError: (ej.error||('HTTP '+resp.status))}; }
+  const h=resp.headers.get('X-Atlas-First-Audio-Ms');
+  const ttfa = h!=null ? (parseInt(h,10)||null) : null;
+  const canMSE = ('MediaSource' in window) && MediaSource.isTypeSupported('audio/mpeg') && resp.body && resp.body.getReader;
+  window.__mseUsed = !!canMSE;
+  if(canMSE){
+    try {
+      const ms=new MediaSource();
+      pPlayer.src=URL.createObjectURL(ms);
+      await new Promise(r=>ms.addEventListener('sourceopen', r, {once:true}));
+      const sb=ms.addSourceBuffer('audio/mpeg');
+      const reader=resp.body.getReader();
+      pPlayer.play().catch(()=>{});
+      while(true){
+        const {done,value}=await reader.read();
+        if(done) break;
+        await new Promise((res,rej)=>{
+          sb.addEventListener('updateend', res, {once:true});
+          try { sb.appendBuffer(value); } catch(e){ rej(e); }
+        });
+      }
+      if(ms.readyState==='open'){ try{ ms.endOfStream(); }catch(e){} }
+      return ttfa;
+    } catch(e){
+      window.__mseUsed=false;   // MSE failed mid-stream; nothing else we can do without re-fetch
+      throw e;
+    }
+  }
+  // fallback: buffer fully, then play (reliable, slightly higher felt latency)
+  const blob=await resp.blob();
+  pPlayer.src=URL.createObjectURL(blob);
+  pPlayer.play().catch(()=>{});
+  return ttfa;
+}
 </script>
 </body>
 </html>"""
