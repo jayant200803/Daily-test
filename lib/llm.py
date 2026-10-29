@@ -5,11 +5,37 @@ Default = Groq. Kept separate from lib/atlas.py because the Atlas "docs only"
 golden rule governs the Atlas calls, not this third-party LLM.
 """
 import os
+import re
 import time
 import json
 import requests
 
 from config import LLM_BASE_URL, LLM_MODEL, LLM_KEY_ENV
+
+
+def _clean_reply(text):
+    """Guard against the model mashing several turns/questions into one reply.
+    Keep the first clean line: de-duplicate repeated sentences and stop after the
+    first question (a voice agent asks one thing at a time), max 2 sentences."""
+    text = (text or "").strip()
+    if not text:
+        return text
+    # ensure a space after sentence punctuation (fixes "depart?When" -> "depart? When")
+    text = re.sub(r'([.?!])(?=[A-Za-z0-9])', r'\1 ', text)
+    parts = re.findall(r'[^.?!]*[.?!]', text)   # complete sentences only
+    if not parts:
+        return text                              # no punctuation -> leave as-is
+    out, seen = [], set()
+    for p in parts:
+        s = p.strip()
+        key = s.lower()
+        if not s or key in seen:
+            continue
+        seen.add(key)
+        out.append(s)
+        if s.endswith('?') or len(out) >= 2:     # one question max / 2 sentences max
+            break
+    return " ".join(out).strip() or text
 
 
 def chat(user_text=None, system=None, model=None, history=None):
@@ -76,4 +102,4 @@ def chat(user_text=None, system=None, model=None, history=None):
     except requests.RequestException as e:
         return {"status": None, "error": f"request failed: {e}"}
     return {"status": 200, "elapsed_ms": int((time.time() - t0) * 1000),
-            "ttft_ms": ttft_ms, "text": "".join(parts).strip()}
+            "ttft_ms": ttft_ms, "text": _clean_reply("".join(parts))}
