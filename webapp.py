@@ -23,6 +23,7 @@ import concurrent.futures as _cf
 from config import SPEAK_VOICE, ASSISTANT_SYSTEM, LLM_KEY_ENV, LLM_MODEL
 from lib import atlas, llm
 from benchmark import providers as bench
+from benchmark import streaming as bstream
 
 app = Flask(__name__)
 
@@ -818,21 +819,29 @@ def api_bench_stt_live():
     audio = f.read()
     lang = request.form.get("language", "en") or "en"
     reference = (request.form.get("reference") or "").strip()
+    STREAMING = {"Atlas", "Deepgram"}   # have realtime APIs -> measure time-to-first-word
 
-    def one(item):
-        name, fn = item
-        try:
-            r = fn(audio, lang)
-        except Exception as e:
-            r = {"text": "", "latency_ms": None, "mode": "?", "status": f"exc:{e}"}
-        row = {"provider": name, "transcript": r.get("text"), "latency_ms": r.get("latency_ms"),
-               "mode": r.get("mode"), "accuracy": None}
+    def one(name):
+        if name in STREAMING:
+            r = bstream.streaming_ttfp(name, audio, lang)
+            text = r.get("transcript") or ""
+            latency = r.get("ttfp_ms")
+            mode = "streaming (time to first word)"
+        else:
+            try:
+                rr = bench.STT_PROVIDERS[name](audio, lang)
+            except Exception as e:
+                rr = {"text": "", "latency_ms": None, "mode": f"exc:{e}"}
+            text = rr.get("text") or ""
+            latency = rr.get("latency_ms")
+            mode = rr.get("mode")
+        row = {"provider": name, "transcript": text, "latency_ms": latency, "mode": mode, "accuracy": None}
         if reference:
-            score = bench.cer(reference, r.get("text") or "") if lang == "ja" else bench.wer(reference, r.get("text") or "")
+            score = bench.cer(reference, text) if lang == "ja" else bench.wer(reference, text)
             row["accuracy"] = round((1 - score) * 100, 1)
         return row
     with _cf.ThreadPoolExecutor(max_workers=4) as ex:
-        rows = list(ex.map(one, bench.STT_PROVIDERS.items()))
+        rows = list(ex.map(one, list(bench.STT_PROVIDERS.keys())))
     order = {"Atlas": 0, "ElevenLabs": 1, "Deepgram": 2, "AssemblyAI": 3}
     rows.sort(key=lambda x: order.get(x["provider"], 9))
     g._detail = "BENCH stt_live " + lang
