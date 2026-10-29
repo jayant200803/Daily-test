@@ -784,10 +784,10 @@ def api_respond():
     history = data.get("history")
     if not text and not history:
         return jsonify(ok=False, error="no text"), 400
-    # history (full conversation incl. latest user turn) gives the model memory.
+    # recent turns give memory; keep short to limit tokens/minute on the free LLM tier.
     llm_started = time.time()
     if isinstance(history, list) and history:
-        chat = llm.chat(system=ASSISTANT_SYSTEM, history=history[-16:])
+        chat = llm.chat(system=ASSISTANT_SYSTEM, history=history[-8:])
     else:
         chat = llm.chat(text, system=ASSISTANT_SYSTEM)
     llm_ended = time.time()
