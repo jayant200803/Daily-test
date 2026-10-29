@@ -16,24 +16,30 @@ from config import LLM_BASE_URL, LLM_MODEL, LLM_KEY_ENV
 def _clean_reply(text):
     """Guard against the model mashing several turns/questions into one reply.
     Keep the first clean line: de-duplicate repeated sentences and stop after the
-    first question (a voice agent asks one thing at a time), max 2 sentences."""
+    first question (a voice agent asks one thing at a time), max 3 sentences.
+    Does NOT split on periods inside emails/domains/decimals (e.g. gmail.com, 3.5)."""
     text = (text or "").strip()
     if not text:
         return text
-    # ensure a space after sentence punctuation (fixes "depart?When" -> "depart? When")
-    text = re.sub(r'([.?!])(?=[A-Za-z0-9])', r'\1 ', text)
-    parts = re.findall(r'[^.?!]*[.?!]', text)   # complete sentences only
-    if not parts:
-        return text                              # no punctuation -> leave as-is
+    # Mark sentence boundaries: Japanese 。！？ always end a sentence; ASCII . ? ! only
+    # when followed by whitespace or end-of-string (so "gmail.com" / "3.5" stay intact).
+    SEP = "\x1f"   # sentinel marking a sentence boundary
+    # Always split after ? ! and Japanese 。！？ (these don't occur inside emails/numbers),
+    # which also catches run-on garble like "depart?When".
+    marked = re.sub(r'[。！？?!]', lambda m: m.group(0) + SEP, text)
+    # Split after ASCII '.' ONLY before whitespace/end, so "gmail.com" and "3.5" stay intact.
+    marked = re.sub(r'\.(?=\s|$)', lambda m: m.group(0) + SEP, marked)
+    sents = [s.strip() for s in marked.split(SEP) if s.strip()]
+    if not sents:
+        return text
     out, seen = [], set()
-    for p in parts:
-        s = p.strip()
+    for s in sents:
         key = s.lower()
-        if not s or key in seen:
+        if key in seen:
             continue
         seen.add(key)
         out.append(s)
-        if s.endswith('?') or len(out) >= 3:     # stop after the first question; max 3 sentences
+        if s.endswith('?') or s.endswith('？') or len(out) >= 3:
             break
     return " ".join(out).strip() or text
 
