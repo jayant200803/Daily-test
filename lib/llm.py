@@ -101,7 +101,7 @@ def chat(user_text=None, system=None, model=None, history=None):
         "model": model or LLM_MODEL,
         "messages": messages,
         "temperature": 0.4,
-        "max_tokens": 700,       # room for reasoning + a short reply (complex turns need it)
+        "max_tokens": 500,       # room for reasoning + a short reply, while saving TPM
         "reasoning_effort": "low",
         "stream": True,          # stream so we can measure Time To First Token (TTFT)
     }
