@@ -850,13 +850,22 @@ def api_speak_stream():
         g._detail = f"SPEAK_STREAM fail status={last}"
         return jsonify(ok=False, error=f"atlas-speak returned {last}",
                        detail="Atlas was temporarily unavailable; please try again."), 502
-    # Atlas's own Time To First Audio (TTFA) — the market-standard TTS metric.
+    # Atlas's own Time To First Audio (TTFA) — available from headers immediately.
     ttfa = upstream.headers.get("X-Atlas-First-Audio-Ms")
-    audio = upstream.content
-    upstream.close()
-    g._detail = f"SPEAK_STREAM ok voice={voice} fmt={fmt} chars={len(text)} ttfa={ttfa}ms bytes={len(audio)}"
-    resp = Response(audio, mimetype=mime)
+    g._detail = f"SPEAK_STREAM stream voice={voice} fmt={fmt} chars={len(text)} ttfa={ttfa}ms"
+
+    # STREAM chunks as Atlas produces them, so the browser (MediaSource) can start
+    # playing at the first chunk instead of waiting for the whole clip.
+    def generate():
+        try:
+            for chunk in upstream.iter_content(chunk_size=4096):
+                if chunk:
+                    yield chunk
+        finally:
+            upstream.close()
+    resp = Response(generate(), mimetype=mime)
     resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-Accel-Buffering"] = "no"
     if ttfa is not None:
         resp.headers["X-Atlas-First-Audio-Ms"] = str(ttfa)
         resp.headers["Access-Control-Expose-Headers"] = "X-Atlas-First-Audio-Ms"
