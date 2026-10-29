@@ -19,8 +19,10 @@ try:
 except ImportError:
     pass
 
+import concurrent.futures as _cf
 from config import SPEAK_VOICE, ASSISTANT_SYSTEM, LLM_KEY_ENV, LLM_MODEL
 from lib import atlas, llm
+from benchmark import providers as bench
 
 app = Flask(__name__)
 
@@ -94,6 +96,7 @@ PAGE = """<!doctype html>
   <h1>Atlas Live Test</h1>
   <p class="sub">Speak to test <b>atlas-listen</b> (STT). Type to test <b>atlas-speak</b> (TTS). Endpoints are exactly per the Atlas docs; nothing is scored.</p>
   <p class="sub" style="margin-top:-12px"><a href="/pipeline" style="color:#2f81f7">→ Open the Speech-to-Speech pipeline page (live transcription + latency + spoken reply)</a></p>
+  <p class="sub" style="margin-top:-12px"><a href="/benchmark" style="color:#2f81f7">→ Open the Voice Benchmark (compare Atlas vs ElevenLabs, Cartesia, Deepgram, AssemblyAI — live)</a></p>
 
   <div class="card">
     <h2>🔴 Live transcription (streaming) &rarr; atlas-listen</h2>
@@ -621,6 +624,140 @@ def index():
 @app.get("/pipeline")
 def pipeline():
     return render_template_string(PIPELINE_PAGE)
+
+
+BENCH_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Voice Benchmark</title>
+<style>
+ :root{--bg:#0f1419;--card:#1a222c;--fg:#e6edf3;--muted:#8b98a5;--accent:#2f81f7;--ok:#2ea043;--border:#30363d;}
+ body{margin:0;font:16px/1.5 system-ui,Segoe UI,sans-serif;background:var(--bg);color:var(--fg);}
+ .wrap{max-width:900px;margin:0 auto;padding:24px 16px 64px;} a{color:var(--accent);text-decoration:none;}
+ h1{font-size:22px;margin:0 0 4px;} .sub{color:var(--muted);font-size:14px;margin:0 0 20px;}
+ .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:20px;}
+ h2{font-size:17px;margin:0 0 12px;} label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px;}
+ input,select,textarea{width:100%;background:#0d1117;color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font:inherit;}
+ button{cursor:pointer;border:0;border-radius:8px;padding:10px 18px;font:inherit;font-weight:600;color:#fff;background:var(--accent);margin-top:12px;}
+ button:disabled{opacity:.5;}
+ table{width:100%;border-collapse:collapse;margin-top:14px;font-size:14px;}
+ th,td{border:1px solid var(--border);padding:8px 10px;text-align:left;vertical-align:top;}
+ th{background:#0d1117;color:var(--muted);} .best{color:var(--ok);font-weight:700;}
+ audio{width:220px;height:34px;} .meta{color:var(--muted);font-size:12px;} .err{color:#e5534b;}
+</style></head><body><div class="wrap">
+ <h1>Voice Provider Benchmark</h1>
+ <p class="sub">Run the comparison live. The SAME text/audio is sent to each provider and measured now, over the real network. <a href="/">&larr; back</a></p>
+
+ <div class="card">
+  <h2>🔊 TTS speed — Atlas vs ElevenLabs vs Cartesia</h2>
+  <label>Text to speak</label>
+  <textarea id="ttsText">Thank you for calling Manulife Finance, how may I help you today?</textarea>
+  <label>Language</label>
+  <select id="ttsLang"><option value="en" selected>English</option><option value="ja">Japanese</option></select>
+  <button id="ttsBtn">Compare TTS</button>
+  <div id="ttsOut"></div>
+ </div>
+
+ <div class="card">
+  <h2>📝 STT accuracy — Atlas vs Deepgram vs AssemblyAI</h2>
+  <p class="meta">We generate one clean clip of this text, then every provider transcribes the SAME clip.</p>
+  <label>Reference text (the correct words)</label>
+  <textarea id="sttText">I would like to transfer five thousand dollars to my savings account.</textarea>
+  <label>Language</label>
+  <select id="sttLang"><option value="en" selected>English (WER)</option><option value="ja">Japanese (CER)</option></select>
+  <button id="sttBtn">Compare STT</button>
+  <div id="sttOut"></div>
+ </div>
+ <p class="meta">Notes: lower first-byte = voice starts sooner; higher accuracy = better. AssemblyAI runs in batch mode, so compare its accuracy, not its latency. Latency includes network from the server to each provider.</p>
+</div>
+<script>
+const el=id=>document.getElementById(id);
+const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+el('ttsBtn').onclick=async()=>{
+ el('ttsBtn').disabled=true; el('ttsOut').innerHTML='<p class="meta">measuring…</p>';
+ try{
+  const r=await fetch('/api/bench/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:el('ttsText').value,lang:el('ttsLang').value})});
+  const j=await r.json();
+  const oks=j.rows.filter(x=>x.first_byte_ms!=null).map(x=>x.first_byte_ms); const best=oks.length?Math.min(...oks):null;
+  let h='<table><tr><th>Provider</th><th>First-byte latency</th><th>Total time</th><th>Listen</th></tr>';
+  for(const x of j.rows){const fb=x.first_byte_ms!=null?x.first_byte_ms+' ms':'<span class=err>'+x.status+'</span>';const cls=x.first_byte_ms===best?'best':'';
+   h+=`<tr><td>${x.provider}</td><td class="${cls}">${fb}</td><td>${x.total_ms!=null?x.total_ms+' ms':'-'}</td><td>${x.audio_b64?`<audio controls src="data:audio/mpeg;base64,${x.audio_b64}"></audio>`:'-'}</td></tr>`;}
+  h+='</table>'; el('ttsOut').innerHTML=h;
+ }catch(e){el('ttsOut').innerHTML='<p class="err">'+e.message+'</p>';}
+ el('ttsBtn').disabled=false;
+};
+el('sttBtn').onclick=async()=>{
+ el('sttBtn').disabled=true; el('sttOut').innerHTML='<p class="meta">generating clip + transcribing… (a few seconds)</p>';
+ try{
+  const r=await fetch('/api/bench/stt',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:el('sttText').value,lang:el('sttLang').value})});
+  const j=await r.json();
+  if(j.error){el('sttOut').innerHTML='<p class="err">'+esc(j.error)+'</p>';el('sttBtn').disabled=false;return;}
+  const best=Math.max(...j.rows.map(x=>x.accuracy));
+  let h=`<p class="meta">Test clip: <audio controls src="data:audio/mpeg;base64,${j.clip_b64}"></audio> &nbsp; metric: <b>${j.metric}</b></p>`;
+  h+='<table><tr><th>Provider</th><th>Accuracy</th><th>Latency</th><th>Mode</th><th>What it heard</th></tr>';
+  for(const x of j.rows){const cls=x.accuracy===best?'best':'';
+   h+=`<tr><td>${x.provider}</td><td class="${cls}">${x.accuracy}%</td><td>${x.latency_ms!=null?x.latency_ms+' ms':'-'}</td><td class="meta">${x.mode}</td><td>${esc(x.transcript)}</td></tr>`;}
+  h+='</table>'; el('sttOut').innerHTML=h;
+ }catch(e){el('sttOut').innerHTML='<p class="err">'+e.message+'</p>';}
+ el('sttBtn').disabled=false;
+};
+</script></body></html>"""
+
+
+@app.get("/benchmark")
+def benchmark_page():
+    return render_template_string(BENCH_PAGE)
+
+
+@app.post("/api/bench/tts")
+def api_bench_tts():
+    import base64 as _b64
+    d = request.get_json(silent=True) or {}
+    text = (d.get("text") or "").strip(); lang = d.get("lang", "en")
+    if not text:
+        return jsonify(rows=[])
+
+    def one(item):
+        name, fn = item
+        try:
+            r = fn(text, lang)
+        except Exception as e:
+            return {"provider": name, "first_byte_ms": None, "total_ms": None, "status": f"exc:{e}", "audio_b64": None}
+        return {"provider": name, "first_byte_ms": r.get("first_byte_ms"), "total_ms": r.get("total_ms"),
+                "status": r.get("status"),
+                "audio_b64": (_b64.b64encode(r["audio"]).decode() if r.get("status") == 200 and r.get("audio") else None)}
+    with _cf.ThreadPoolExecutor(max_workers=4) as ex:
+        rows = list(ex.map(one, bench.TTS_PROVIDERS.items()))
+    order = {"Atlas": 0, "ElevenLabs": 1, "Cartesia": 2, "Deepgram": 3}
+    rows.sort(key=lambda x: order.get(x["provider"], 9))
+    g._detail = "BENCH tts " + lang
+    return jsonify(rows=rows)
+
+
+@app.post("/api/bench/stt")
+def api_bench_stt():
+    import base64 as _b64
+    d = request.get_json(silent=True) or {}
+    text = (d.get("text") or "").strip(); lang = d.get("lang", "en")
+    if not text:
+        return jsonify(error="no text")
+    clip = bench.gen_stt_clip(text, lang)
+    if not clip:
+        return jsonify(error="Could not generate the test clip (check ElevenLabs key/credits on the server).")
+
+    def one(item):
+        name, fn = item
+        try:
+            r = fn(clip, lang)
+        except Exception as e:
+            r = {"text": "", "latency_ms": None, "mode": "?", "status": f"exc:{e}"}
+        score = bench.cer(text, r.get("text") or "") if lang == "ja" else bench.wer(text, r.get("text") or "")
+        return {"provider": name, "transcript": r.get("text"), "accuracy": round((1 - score) * 100, 1),
+                "latency_ms": r.get("latency_ms"), "mode": r.get("mode")}
+    with _cf.ThreadPoolExecutor(max_workers=4) as ex:
+        rows = list(ex.map(one, bench.STT_PROVIDERS.items()))
+    order = {"Atlas": 0, "ElevenLabs": 1, "Deepgram": 2, "AssemblyAI": 3}
+    rows.sort(key=lambda x: order.get(x["provider"], 9))
+    g._detail = "BENCH stt " + lang
+    return jsonify(clip_b64=_b64.b64encode(clip).decode(), metric=("CER" if lang == "ja" else "WER"), rows=rows)
 
 
 @app.get("/api/rtkey")
