@@ -676,11 +676,11 @@ el('ttsBtn').onclick=async()=>{
  try{
   const r=await fetch('/api/bench/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:el('ttsText').value,lang:el('ttsLang').value})});
   const j=await r.json();
-  const oks=j.rows.filter(x=>x.first_byte_ms!=null).map(x=>x.first_byte_ms); const best=oks.length?Math.min(...oks):null;
-  let h='<table><tr><th>Provider</th><th>First-byte latency</th><th>Total time</th><th>Listen</th></tr>';
-  for(const x of j.rows){const fb=x.first_byte_ms!=null?x.first_byte_ms+' ms':'<span class=err>'+x.status+'</span>';const cls=x.first_byte_ms===best?'best':'';
-   h+=`<tr><td>${x.provider}</td><td class="${cls}">${fb}</td><td>${x.total_ms!=null?x.total_ms+' ms':'-'}</td><td>${x.audio_b64?`<audio controls src="data:audio/mpeg;base64,${x.audio_b64}"></audio>`:'-'}</td></tr>`;}
-  h+='</table>'; el('ttsOut').innerHTML=h;
+  const oks=j.rows.filter(x=>x.processing_ms!=null).map(x=>x.processing_ms); const best=oks.length?Math.min(...oks):null;
+  let h='<table><tr><th>Provider</th><th>Processing latency<br><span class=meta>(network removed)</span></th><th>First-byte<br><span class=meta>(incl. network)</span></th><th>Network RTT</th><th>Listen</th></tr>';
+  for(const x of j.rows){const proc=x.processing_ms!=null?x.processing_ms+' ms':'<span class=err>'+x.status+'</span>';const cls=x.processing_ms===best?'best':'';
+   h+=`<tr><td>${x.provider}</td><td class="${cls}">${proc}</td><td>${x.first_byte_ms!=null?x.first_byte_ms+' ms':'-'}</td><td>${x.rtt_ms!=null?x.rtt_ms+' ms':'-'}</td><td>${x.audio_b64?`<audio controls src="data:audio/mpeg;base64,${x.audio_b64}"></audio>`:'-'}</td></tr>`;}
+  h+='</table><p class="meta">Processing latency = first-byte minus one network round-trip (RTT) = the provider\\'s own speed. Lower = better. Green = fastest.</p>'; el('ttsOut').innerHTML=h;
  }catch(e){el('ttsOut').innerHTML='<p class="err">'+e.message+'</p>';}
  el('ttsBtn').disabled=false;
 };
@@ -721,8 +721,9 @@ def api_bench_tts():
             r = fn(text, lang)
         except Exception as e:
             return {"provider": name, "first_byte_ms": None, "total_ms": None, "status": f"exc:{e}", "audio_b64": None}
-        return {"provider": name, "first_byte_ms": r.get("first_byte_ms"), "total_ms": r.get("total_ms"),
-                "status": r.get("status"),
+        return {"provider": name, "first_byte_ms": r.get("first_byte_ms"),
+                "processing_ms": r.get("processing_ms"), "rtt_ms": r.get("rtt_ms"),
+                "total_ms": r.get("total_ms"), "status": r.get("status"),
                 "audio_b64": (_b64.b64encode(r["audio"]).decode() if r.get("status") == 200 and r.get("audio") else None)}
     with _cf.ThreadPoolExecutor(max_workers=4) as ex:
         rows = list(ex.map(one, bench.TTS_PROVIDERS.items()))
