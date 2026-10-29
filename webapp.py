@@ -243,7 +243,7 @@ async function startLive() {
             language: document.getElementById('liveLang').value,
             prompt: document.getElementById('livePrompt').value || undefined
           },
-          turn_detection: { type: 'server_vad', silence_duration_ms: 500 }
+          turn_detection: { type: 'server_vad', silence_duration_ms: 900 }
         }},
         atlas: { interim: true }
       }
@@ -405,7 +405,7 @@ let ws=null, ctx=null, stream=null, proc=null, src=null, on=false, replying=fals
 let audioEpoch=0, curLine='', interimActive=false;
 let uAudioStart=0, uFirst=null, uTTFP=null, uAudioEnd=null;
 let convo=[], turnBuf='', endTurnTimer=null, tTurnEnd=0, lastSpeechEndWall=0, tStart=0;
-const ENDTURN_MS = 600;   // extra silence after a phrase before we treat the turn as finished (snappy but tolerates short pauses)
+const ENDTURN_MS = 1500;   // wait this long after a phrase before finalizing the turn, so slow speakers who pause mid-sentence are NOT cut off
 const pBtn=document.getElementById('pBtn'), pStatus=document.getElementById('pStatus');
 const pOut=document.getElementById('pOut'), pReply=document.getElementById('pReply');
 const pPlayer=document.getElementById('pPlayer');
@@ -456,7 +456,7 @@ async function start() {
     ws.send(JSON.stringify({type:'session.update',session:{type:'transcription',audio:{input:{
       format:{type:'audio/pcm',rate:rate},
       transcription:{model:'atlas-listen',language:document.getElementById('pLang').value,prompt:undefined},
-      turn_detection:{type:'server_vad',silence_duration_ms:500}}},atlas:{interim:true}}}));
+      turn_detection:{type:'server_vad',silence_duration_ms:900}}},atlas:{interim:true}}}));
     src=ctx.createMediaStreamSource(stream); proc=ctx.createScriptProcessor(4096,1,1);
     proc.onaudioprocess=e=>{ if(!on||replying||ws.readyState!==1) return;   // mute mic while the agent speaks (no echo)
       const f=e.inputBuffer.getChannelData(0); const i=new Int16Array(f.length);
