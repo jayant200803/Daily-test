@@ -31,6 +31,15 @@ def _k(name):
     return (os.environ.get(name) or "").strip()
 
 
+def _mime(audio):
+    """Detect audio type from the first bytes (mic records WAV; our clips are MP3)."""
+    if audio[:4] == b"RIFF":
+        return "audio/wav"
+    if audio[:3] == b"ID3" or (len(audio) > 1 and audio[0] == 0xFF and (audio[1] & 0xE0) == 0xE0):
+        return "audio/mpeg"
+    return "audio/mpeg"
+
+
 def _timed_stream(url, headers, body):
     """POST streaming; measure first-byte, and also the network round-trip to the host so we
     can report processing-only latency (network removed).
@@ -121,10 +130,12 @@ def gen_stt_clip(text, lang):
 def stt_atlas(audio, lang):
     import io
     t0 = time.time()
+    mime = _mime(audio)
+    ext = "wav" if mime == "audio/wav" else "mp3"
     r = requests.post("https://atlas.oneinbox.ai/v1/audio/transcriptions",
                       headers={"Authorization": f"Bearer {_k('ATLAS_API_KEY')}"},
                       data={"model": "atlas-listen", "language": lang},
-                      files={"file": ("clip.mp3", io.BytesIO(audio), "audio/mpeg")}, timeout=60)
+                      files={"file": (f"clip.{ext}", io.BytesIO(audio), mime)}, timeout=60)
     ms = int((time.time() - t0) * 1000)
     try: txt = r.json().get("text", "")
     except Exception: txt = ""
@@ -135,7 +146,7 @@ def stt_deepgram(audio, lang):
     model = "nova-3" if lang == "en" else "nova-2"
     t0 = time.time()
     r = requests.post(f"https://api.deepgram.com/v1/listen?model={model}&language={lang}&smart_format=true",
-                      headers={"Authorization": f"Token {_k('DEEPGRAM_API_KEY')}", "Content-Type": "audio/mpeg"},
+                      headers={"Authorization": f"Token {_k('DEEPGRAM_API_KEY')}", "Content-Type": _mime(audio)},
                       data=audio, timeout=60)
     ms = int((time.time() - t0) * 1000)
     try: txt = r.json()["results"]["channels"][0]["alternatives"][0]["transcript"]

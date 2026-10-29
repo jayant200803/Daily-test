@@ -666,11 +666,58 @@ BENCH_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
   <button id="sttBtn">Compare STT</button>
   <div id="sttOut"></div>
  </div>
- <p class="meta">Notes: lower first-byte = voice starts sooner; higher accuracy = better. AssemblyAI runs in batch mode, so compare its accuracy, not its latency. Latency includes network from the server to each provider.</p>
+ <div class="card">
+  <h2>🎤 Live STT — speak and compare (your real voice)</h2>
+  <p class="meta">Press record, say a sentence, stop. Your actual voice is sent to every STT provider at once — see what each heard and how fast. Optionally type what you said to also get accuracy.</p>
+  <div class="row"><button id="recBtn">Start recording</button><span id="recStatus" class="meta"></span></div>
+  <label>Language</label>
+  <select id="liveLang"><option value="en" selected>English</option><option value="ja">Japanese</option></select>
+  <label>What you said (optional — for accuracy)</label>
+  <input type="text" id="liveRef" placeholder="e.g. I would like to transfer five thousand dollars">
+  <div id="liveOut"></div>
+ </div>
+ <p class="meta">Notes: lower processing/first-byte = voice starts sooner; higher accuracy = better. AssemblyAI runs in batch mode, so compare its accuracy, not its latency.</p>
 </div>
 <script>
 const el=id=>document.getElementById(id);
 const esc=s=>(s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+// ---- live mic STT comparison ----
+let recing=false, actx, mstream, proc, src, bufs=[], sr=16000;
+const recBtn=el('recBtn'), recStatus=el('recStatus'), liveOut=el('liveOut');
+recBtn.onclick=async()=>{ recing ? await stopRec() : await startRec(); };
+async function startRec(){
+ try{ mstream=await navigator.mediaDevices.getUserMedia({audio:true}); }
+ catch(e){ liveOut.innerHTML='<p class="err">Microphone blocked: '+e.message+'</p>'; return; }
+ actx=new (window.AudioContext||window.webkitAudioContext)(); sr=actx.sampleRate;
+ src=actx.createMediaStreamSource(mstream); proc=actx.createScriptProcessor(4096,1,1); bufs=[];
+ proc.onaudioprocess=e=>bufs.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+ src.connect(proc); proc.connect(actx.destination); recing=true;
+ recBtn.textContent='Stop & compare'; recBtn.classList.add?recBtn.classList.add('rec'):0; recStatus.innerHTML='<span class="meta">● recording…</span>';
+}
+async function stopRec(){
+ recing=false; try{proc.disconnect();src.disconnect();mstream.getTracks().forEach(t=>t.stop());await actx.close();}catch{}
+ recBtn.textContent='Start recording'; recStatus.textContent='transcribing with all providers…';
+ const wav=encodeWav(flatten(bufs),sr); const fd=new FormData();
+ fd.append('file',new Blob([wav],{type:'audio/wav'}),'mic.wav');
+ fd.append('language',el('liveLang').value); fd.append('reference',el('liveRef').value);
+ try{
+  const r=await fetch('/api/bench/stt_live',{method:'POST',body:fd}); const j=await r.json(); recStatus.textContent='';
+  if(j.error){liveOut.innerHTML='<p class="err">'+esc(j.error)+'</p>';return;}
+  const accs=j.rows.map(x=>x.accuracy).filter(v=>v!=null); const best=accs.length?Math.max(...accs):null;
+  const fastest=Math.min(...j.rows.map(x=>x.latency_ms).filter(v=>v!=null));
+  let h='<table><tr><th>Provider</th>'+(j.has_reference?'<th>Accuracy</th>':'')+'<th>Latency</th><th>Mode</th><th>What it heard</th></tr>';
+  for(const x of j.rows){const ac=j.has_reference?`<td class="${x.accuracy===best?'best':''}">${x.accuracy!=null?x.accuracy+'%':'-'}</td>`:'';
+   const lc=x.latency_ms===fastest?'best':'';
+   h+=`<tr><td>${x.provider}</td>${ac}<td class="${lc}">${x.latency_ms!=null?x.latency_ms+' ms':'-'}</td><td class="meta">${x.mode}</td><td>${esc(x.transcript)}</td></tr>`;}
+  h+='</table><p class="meta">'+(j.has_reference?'Green accuracy = best. ':'')+'Green latency = fastest (ignore AssemblyAI latency — batch mode).</p>';
+  liveOut.innerHTML=h;
+ }catch(e){recStatus.textContent='';liveOut.innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+}
+function flatten(b){let n=0;b.forEach(x=>n+=x.length);const o=new Float32Array(n);let p=0;b.forEach(x=>{o.set(x,p);p+=x.length;});return o;}
+function encodeWav(s,rate){const buf=new ArrayBuffer(44+s.length*2);const v=new DataView(buf);const w=(o,t)=>{for(let i=0;i<t.length;i++)v.setUint8(o+i,t.charCodeAt(i));};
+ w(0,'RIFF');v.setUint32(4,36+s.length*2,true);w(8,'WAVE');w(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+ v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);w(36,'data');v.setUint32(40,s.length*2,true);
+ let o=44;for(let i=0;i<s.length;i++){let x=Math.max(-1,Math.min(1,s[i]));v.setInt16(o,x<0?x*0x8000:x*0x7FFF,true);o+=2;}return buf;}
 el('ttsBtn').onclick=async()=>{
  el('ttsBtn').disabled=true; el('ttsOut').innerHTML='<p class="meta">measuring…</p>';
  try{
@@ -759,6 +806,37 @@ def api_bench_stt():
     rows.sort(key=lambda x: order.get(x["provider"], 9))
     g._detail = "BENCH stt " + lang
     return jsonify(clip_b64=_b64.b64encode(clip).decode(), metric=("CER" if lang == "ja" else "WER"), rows=rows)
+
+
+@app.post("/api/bench/stt_live")
+def api_bench_stt_live():
+    """Live mic version: transcribe the caller's OWN recorded voice with every STT provider.
+    Accuracy is computed only if a 'reference' (what you said) is provided."""
+    f = request.files.get("file")
+    if not f:
+        return jsonify(error="no audio"), 400
+    audio = f.read()
+    lang = request.form.get("language", "en") or "en"
+    reference = (request.form.get("reference") or "").strip()
+
+    def one(item):
+        name, fn = item
+        try:
+            r = fn(audio, lang)
+        except Exception as e:
+            r = {"text": "", "latency_ms": None, "mode": "?", "status": f"exc:{e}"}
+        row = {"provider": name, "transcript": r.get("text"), "latency_ms": r.get("latency_ms"),
+               "mode": r.get("mode"), "accuracy": None}
+        if reference:
+            score = bench.cer(reference, r.get("text") or "") if lang == "ja" else bench.wer(reference, r.get("text") or "")
+            row["accuracy"] = round((1 - score) * 100, 1)
+        return row
+    with _cf.ThreadPoolExecutor(max_workers=4) as ex:
+        rows = list(ex.map(one, bench.STT_PROVIDERS.items()))
+    order = {"Atlas": 0, "ElevenLabs": 1, "Deepgram": 2, "AssemblyAI": 3}
+    rows.sort(key=lambda x: order.get(x["provider"], 9))
+    g._detail = "BENCH stt_live " + lang
+    return jsonify(metric=("CER" if lang == "ja" else "WER"), has_reference=bool(reference), rows=rows)
 
 
 @app.get("/api/rtkey")
