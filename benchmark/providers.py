@@ -186,6 +186,56 @@ STT_PROVIDERS = {"Atlas": stt_atlas, "ElevenLabs": stt_elevenlabs,
                  "Deepgram": stt_deepgram, "AssemblyAI": stt_assemblyai}
 
 
+# ---- TTS -> WAV (non-streaming): for measuring full generation time, duration, RTF, quality ----
+def _wrap_wav(pcm, rate):
+    import io, wave
+    b = io.BytesIO(); w = wave.open(b, "wb")
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(rate); w.writeframes(pcm); w.close()
+    return b.getvalue()
+
+
+def tts_atlas_wav(text, lang):
+    t0 = time.time()
+    r = requests.post("https://atlas.oneinbox.ai/v1/audio/speech",
+                      headers={"Authorization": f"Bearer {_k('ATLAS_API_KEY')}", "Content-Type": "application/json"},
+                      json={"model": "atlas-speak", "voice": "souta", "input": text, "response_format": "wav"}, timeout=90)
+    return int((time.time() - t0) * 1000), (r.content if r.status_code == 200 else b""), r.status_code
+
+
+def tts_elevenlabs_wav(text, lang):
+    model = "eleven_flash_v2_5" if lang == "en" else "eleven_turbo_v2_5"
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{EL_VOICE}?output_format=pcm_24000"
+    t0 = time.time()
+    r = requests.post(url, headers={"xi-api-key": _k("ELEVENLABS_API_KEY"), "Content-Type": "application/json"},
+                      json={"text": text, "model_id": model}, timeout=90)
+    ms = int((time.time() - t0) * 1000)
+    return ms, (_wrap_wav(r.content, 24000) if r.status_code == 200 else b""), r.status_code
+
+
+def tts_cartesia_wav(text, lang):
+    voice = CART_VOICE_EN if lang == "en" else CART_VOICE_JA
+    t0 = time.time()
+    r = requests.post("https://api.cartesia.ai/tts/bytes",
+                      headers={"X-API-Key": _k("CARTESIA_API_KEY"), "Cartesia-Version": "2024-11-13", "Content-Type": "application/json"},
+                      json={"model_id": "sonic-2", "transcript": text, "voice": {"mode": "id", "id": voice},
+                            "output_format": {"container": "wav", "encoding": "pcm_s16le", "sample_rate": 24000}, "language": lang}, timeout=90)
+    return int((time.time() - t0) * 1000), (r.content if r.status_code == 200 else b""), r.status_code
+
+
+def tts_deepgram_wav(text, lang):
+    if lang != "en":
+        return None, b"", "N/A (English only)"
+    t0 = time.time()
+    r = requests.post("https://api.deepgram.com/v1/speak?model=aura-asteria-en&encoding=linear16&sample_rate=24000&container=wav",
+                      headers={"Authorization": f"Token {_k('DEEPGRAM_API_KEY')}", "Content-Type": "application/json"},
+                      json={"text": text}, timeout=90)
+    return int((time.time() - t0) * 1000), (r.content if r.status_code == 200 else b""), r.status_code
+
+
+TTS_WAV_PROVIDERS = {"Atlas": tts_atlas_wav, "ElevenLabs": tts_elevenlabs_wav,
+                     "Cartesia": tts_cartesia_wav, "Deepgram": tts_deepgram_wav}
+
+
 # ---- scoring ----
 def wer(ref, hyp):
     norm = lambda s: re.sub(r"[^\w\s]", " ", s.lower()).split()
