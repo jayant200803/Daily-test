@@ -1,128 +1,126 @@
-"""Build Voice_Benchmark.xlsx from benchmark/results.json. All numbers are measured, not invented.
-Parameters are explained in plain English on the 'Read me' sheet."""
+"""Build Voice_Benchmark.xlsx from results_full.json: same data as the report, in a
+spreadsheet. All numbers measured; parameters explained in plain English on 'Read me'."""
 import os, json, statistics
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(HERE, "results.json")
 OUT = os.path.join(HERE, "Voice_Benchmark.xlsx")
-HEAD = Font(bold=True, color="FFFFFF"); HEAD_FILL = PatternFill("solid", fgColor="2F5496")
-TITLE = Font(bold=True, size=14); BOLD = Font(bold=True); WRAP = Alignment(wrap_text=True, vertical="top")
-CENTER = Alignment(horizontal="center")
+HEAD = Font(bold=True, color="FFFFFF"); FILL = PatternFill("solid", fgColor="2F5496")
+TITLE = Font(bold=True, size=14); BOLD = Font(bold=True); WRAP = Alignment(wrap_text=True, vertical="top"); CEN = Alignment(horizontal="center")
 
 
 def hdr(ws):
     for c in ws[1]:
-        c.font = HEAD; c.fill = HEAD_FILL; c.alignment = CENTER
+        c.font = HEAD; c.fill = FILL; c.alignment = CEN
 
 
-def widths(ws, w):
-    for col, x in w.items():
-        ws.column_dimensions[col].width = x
+def W(ws, w):
+    for k, v in w.items():
+        ws.column_dimensions[k].width = v
+
+
+def avg(xs):
+    xs = [x for x in xs if x is not None]
+    return round(statistics.mean(xs), 3) if xs else None
 
 
 def main():
-    d = json.load(open(RESULTS, encoding="utf-8"))
+    d = json.load(open(os.path.join(HERE, "results_full.json"), encoding="utf-8"))
     wb = openpyxl.Workbook()
 
     ws = wb.active; ws.title = "Read me"
-    ws["A1"] = "Voice Provider Benchmark — Atlas vs the market"; ws["A1"].font = TITLE
-    rows = [
+    ws["A1"] = "Voice AI Benchmark: Atlas vs the market"; ws["A1"].font = TITLE
+    lines = [
         ("", ""),
-        ("What this is", "A fair side-by-side test. The SAME text (speech) and the SAME audio (transcription) "
-                         "were sent to each provider and the real results measured. No numbers are invented."),
-        ("Generated at (UTC)", d.get("generated_at_utc", "")),
-        ("TTS compared", "Atlas (atlas-speak), ElevenLabs, Cartesia, Deepgram (Aura, English only)."),
-        ("STT compared", "Atlas (atlas-listen), ElevenLabs (Scribe), Deepgram, AssemblyAI."),
+        ("What this is", "A fair, measured comparison of TTS and STT providers. Same input sent to each; "
+                         "measured the same way at the same time. Every number is measured: nothing estimated."),
+        ("Generated (UTC)", d.get("generated_at_utc", "")),
+        ("Providers", "Atlas, ElevenLabs, Cartesia, Deepgram, AssemblyAI."),
         ("", ""),
-        ("--- TTS parameters (plain English) ---", ""),
-        ("Processing latency (ms)", "The MAIN number. Time until the first audio comes out, with the NETWORK "
-                                    "REMOVED (we measure the round-trip to each provider and subtract it). This "
-                                    "shows the provider's OWN speed, not where we run from. Lower = better."),
-        ("First-byte latency (ms)", "Time until the first audio byte reaches us, INCLUDING the network. Shown for "
-                                    "transparency; processing = first-byte minus network round-trip."),
-        ("Total time (ms)", "Time until the whole audio clip is received."),
-        ("Median", f"Middle value across {d.get('tts_runs_per_sentence')} runs per sentence (so one slow run doesn't skew it)."),
+        ("--- TTS parameters ---", ""),
+        ("WER (correctness)", "The generated audio is transcribed by a neutral recognizer (Deepgram) and compared "
+                              "to the input text. WER = (substitutions+insertions+deletions) / words. Lower is better. "
+                              "Japanese uses CER (characters), since Japanese has no spaces."),
+        ("Naturalness", "How clean/human the voice sounds, from Harmonics-to-Noise Ratio, mapped to 1-5. "
+                        "Naturalness = 1 + HNR/7.5 (clamped 1-5). Higher is better."),
+        ("Prosody (Hz)", "Expressiveness = standard deviation of pitch. More variation = less robotic. Higher is better."),
+        ("Speed (RTF)", "Real-Time Factor = generation time / audio duration. Below 1 is faster than real time; "
+                        "near 1 is slow for live agents. Lower is better."),
+        ("Robustness", "WER measured only on hard sentences (numbers, currency, symbols, email). Lower is better."),
+        ("Time-to-first-audio (ms)", "Time from sending text to first audio received, with the network round-trip "
+                                     "subtracted (reflects the provider's own speed). Lower is better."),
         ("", ""),
-        ("--- STT parameters (plain English) ---", ""),
-        ("Latency (ms)", "For Atlas and Deepgram: STREAMING 'time to first word' — audio is streamed to their "
-                         "realtime API and we time the first word (the metric that matters for a live voice agent, "
-                         "same as the speech-to-speech model). For AssemblyAI and ElevenLabs: batch mode, so compare "
-                         "their ACCURACY, not their latency."),
-        ("Accuracy (%)", "How close the transcript was to the correct words. 100% = perfect. Higher = better."),
-        ("WER (English)", "Word Error Rate — share of WORDS wrong. Accuracy = 100% minus WER."),
-        ("CER (Japanese)", "Character Error Rate — share of CHARACTERS wrong. Used for Japanese (no spaces between words)."),
-        ("Mode", "'streaming (time to first word)' = realtime. 'batch' = whole file processed at once."),
+        ("--- STT parameters ---", ""),
+        ("Accuracy (%)", "How close the transcript was to the correct words (100% = perfect). Higher is better."),
+        ("Latency (ms)", "For Atlas/Deepgram: streaming time-to-first-word (realtime, the metric for voice agents). "
+                         "For AssemblyAI: batch mode, so compare its accuracy, not latency. ElevenLabs STT needs the "
+                         "Speech-to-Text key permission (0% = permission off)."),
         ("", ""),
-        ("--- Honest notes ---", ""),
-        ("Fairness", "All measured the same way, at the same time, from one machine. The relative comparison is the point."),
-        ("STT test audio", "Clean speech generated by a TTS voice (ElevenLabs); the SAME clip is sent to every STT "
-                           "provider. Real noisy phone calls may score differently."),
-        ("Number formatting", "Sentences with numbers (e.g. 'five thousand dollars') lower accuracy for everyone because "
-                              "engines format them differently ('$5,000'); it's an equal penalty, not a real error."),
+        ("--- Notes ---", ""),
+        ("Fairness", "All measured the same way, same time, one machine. Latency is network-removed. The relative "
+                     "comparison is the point."),
         ("Deepgram TTS", "English only (Aura). Japanese shows N/A."),
-        ("ElevenLabs STT", "Needs the Speech-to-Text permission on the key; 0% means the permission is off."),
+        ("Numbers in sentences", "Hard sentences lower WER for everyone (engines format numbers differently); it's an equal penalty."),
     ]
     r = 3
-    for a, b in rows:
+    for a, b in lines:
         ws.cell(r, 1, a).font = TITLE if a.startswith("---") else (BOLD if a else None)
         ws.cell(r, 2, b).alignment = WRAP
         r += 1
-    widths(ws, {"A": 34, "B": 95})
+    W(ws, {"A": 30, "B": 98})
 
     # TTS Summary
     ws = wb.create_sheet("TTS Summary")
-    ws.append(["Provider", "Language", "Processing latency — median (ms) [network removed]",
-               "First-byte — median (ms) [incl. network]", "Total — median (ms)", "Sentences OK"])
+    ws.append(["Provider", "Language", "WER (lower=better)", "Naturalness (higher)", "Prosody Hz (higher)",
+               "Speed RTF (lower)", "Robustness hard-WER (lower)", "Time-to-first-audio ms (lower)", "Gen time ms"])
     hdr(ws)
-    agg = {}
-    for x in d["tts"]:
-        agg.setdefault((x["provider"], x["language"]), []).append(x)
-    for (p, l), rs in sorted(agg.items()):
-        pr = [r["processing_ms_median"] for r in rs if r["processing_ms_median"] is not None]
-        fb = [r["first_byte_ms_median"] for r in rs if r["first_byte_ms_median"] is not None]
-        tt = [r["total_ms_median"] for r in rs if r["total_ms_median"] is not None]
-        ws.append([p, l, int(statistics.median(pr)) if pr else "N/A",
-                   int(statistics.median(fb)) if fb else "-", int(statistics.median(tt)) if tt else "-",
-                   f"{len(pr)}/{len(rs)}"])
-    widths(ws, {"A": 12, "B": 9, "C": 42, "D": 38, "E": 20, "F": 12})
+    for lang in ("en", "ja"):
+        for p in ["Atlas", "ElevenLabs", "Cartesia", "Deepgram"]:
+            rs = [x for x in d["tts"] if x["provider"] == p and x["language"] == lang and x.get("rtf") is not None]
+            if not rs:
+                ws.append([p, lang, "N/A", "", "", "", "", "", ""]); continue
+            hard = [x["wer"] for x in rs if x["category"] == "hard" and x["wer"] is not None]
+            ws.append([p, lang, avg([x["wer"] for x in rs]), avg([x["naturalness"] for x in rs]),
+                       avg([x["prosody_hz"] for x in rs]), avg([x["rtf"] for x in rs]), avg(hard),
+                       int(avg([x["ttfa_ms"] for x in rs]) or 0) or "-", int(avg([x["gen_time_ms"] for x in rs]) or 0) or "-"])
+    W(ws, {"A": 12, "B": 9, "C": 18, "D": 18, "E": 18, "F": 16, "G": 24, "H": 26, "I": 12})
 
     # STT Summary
     ws = wb.create_sheet("STT Summary")
-    ws.append(["Provider", "Language", "Metric", "Average accuracy (%)", "Average latency (ms)", "Mode"])
+    ws.append(["Provider", "Language", "Metric", "Accuracy % (higher)", "Latency ms (lower)", "Mode"])
     hdr(ws)
-    agg = {}
-    for x in d["stt"]:
-        agg.setdefault((x["provider"], x["language"]), []).append(x)
-    for (p, l), rs in sorted(agg.items()):
-        ac = [r["accuracy_pct"] for r in rs if r["accuracy_pct"] is not None]
-        la = [r["latency_ms"] for r in rs if r["latency_ms"] is not None]
-        ws.append([p, l, rs[0]["metric"], round(statistics.mean(ac), 1) if ac else "-",
-                   int(statistics.mean(la)) if la else "-", rs[0]["mode"]])
-    widths(ws, {"A": 12, "B": 9, "C": 8, "D": 20, "E": 20, "F": 34})
+    for lang in ("en", "ja"):
+        for p in ["Atlas", "ElevenLabs", "Deepgram", "AssemblyAI"]:
+            rs = [x for x in d["stt"] if x["provider"] == p and x["language"] == lang]
+            if not rs:
+                continue
+            ws.append([p, lang, rs[0]["metric"], avg([x["accuracy_pct"] for x in rs]),
+                       int(avg([x["latency_ms"] for x in rs]) or 0) or "-", rs[0]["mode"]])
+    W(ws, {"A": 12, "B": 9, "C": 8, "D": 20, "E": 20, "F": 34})
 
     # TTS raw
     ws = wb.create_sheet("TTS raw")
-    ws.append(["Provider", "Language", "#", "Sentence", "Processing (ms)", "First-byte (ms)", "Total (ms)", "Runs OK", "Status"])
+    ws.append(["Provider", "Lang", "ID", "Category", "Sentence", "WER", "Naturalness", "Prosody Hz", "RTF",
+               "TTFA ms", "Gen ms", "Audio s", "Transcript (heard)"])
     hdr(ws)
     for x in d["tts"]:
-        ws.append([x["provider"], x["language"], x["sentence_index"], x["sentence"], x["processing_ms_median"],
-                   x["first_byte_ms_median"], x["total_ms_median"], f'{x["runs_ok"]}/{x["runs_total"]}', x["status"]])
-    widths(ws, {"A": 12, "B": 9, "C": 4, "D": 55, "E": 16, "F": 16, "G": 12, "H": 9, "I": 16})
-    for row in ws.iter_rows(min_row=2): row[3].alignment = WRAP
+        ws.append([x["provider"], x["language"], x["id"], x["category"], x["text"], x["wer"], x["naturalness"],
+                   x["prosody_hz"], x["rtf"], x["ttfa_ms"], x["gen_time_ms"], x["audio_sec"], x.get("transcript", "")])
+    W(ws, {"A": 11, "B": 5, "C": 11, "D": 10, "E": 46, "F": 8, "G": 11, "H": 11, "I": 7, "J": 9, "K": 8, "L": 8, "M": 46})
+    for row in ws.iter_rows(min_row=2):
+        row[4].alignment = WRAP; row[12].alignment = WRAP
 
     # STT raw
     ws = wb.create_sheet("STT raw")
-    ws.append(["Provider", "Language", "#", "Reference (correct)", "Transcript (what it heard)", "Metric",
-               "Accuracy (%)", "Latency (ms)", "Mode"])
+    ws.append(["Provider", "Lang", "ID", "Category", "Reference", "Transcript (heard)", "Metric", "Accuracy %", "Latency ms", "Mode"])
     hdr(ws)
     for x in d["stt"]:
-        ws.append([x["provider"], x["language"], x["sentence_index"], x["reference"], x["transcript"],
+        ws.append([x["provider"], x["language"], x["id"], x["category"], x["reference"], x["transcript"],
                    x["metric"], x["accuracy_pct"], x["latency_ms"], x["mode"]])
-    widths(ws, {"A": 12, "B": 9, "C": 4, "D": 45, "E": 45, "F": 8, "G": 12, "H": 12, "I": 30})
+    W(ws, {"A": 11, "B": 5, "C": 11, "D": 10, "E": 42, "F": 42, "G": 7, "H": 11, "I": 11, "J": 28})
     for row in ws.iter_rows(min_row=2):
-        row[3].alignment = WRAP; row[4].alignment = WRAP
+        row[4].alignment = WRAP; row[5].alignment = WRAP
 
     wb.save(OUT)
     print("Saved ->", OUT)

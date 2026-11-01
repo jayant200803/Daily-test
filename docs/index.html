@@ -1,6 +1,6 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voice AI Benchmark — Atlas vs the market</title>
+<title>Voice AI Benchmark: Atlas vs the market</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
  :root{--bg:#0f1419;--card:#161c24;--fg:#e6edf3;--muted:#8b98a5;--line:#2b333d;--blue:#2f81f7;}
@@ -46,20 +46,20 @@
 
 <h2>3. TTS metric comparison</h2>
 <div class="chartbox"><canvas id="radar"></canvas></div>
-<p class="meta">Radar values are scaled 0–100 where higher is better, for visual comparison only (English TTS).</p>
+<p class="meta">Radar values are scaled 0 to 100 where higher is better, for visual comparison only (English TTS).</p>
 
 <h2>4. How each number is measured</h2>
-<div class="metric"><b>Time-to-first-audio (TTFA)</b> — how long from sending the text until the first audio is received, with the network round-trip subtracted so it reflects the provider's own speed.<div class="formula">TTFA = first-audio-byte time − network round-trip</div></div>
-<div class="metric"><b>Full generation time</b> — how long until the whole audio clip is produced.</div>
-<div class="metric"><b>Speed (RTF, Real-Time Factor)</b> — generation time divided by how long the audio plays. Below 1 is faster than real time; near 1 is slow for live use.<div class="formula">RTF = generation time ÷ audio duration</div></div>
-<div class="metric"><b>Correctness (WER)</b> — the generated audio is transcribed by a neutral speech recognizer (Deepgram) and compared to the input text. Lower is better.<div class="formula">WER = (substitutions + insertions + deletions) ÷ total words</div><span class="meta">Japanese uses CER (character error rate), since Japanese has no spaces between words.</span></div>
-<div class="metric"><b>Naturalness</b> — how clean and human the voice sounds, from the Harmonics-to-Noise Ratio (HNR) of the audio, mapped to a 1–5 score. Higher is better.<div class="formula">Naturalness = 1 + HNR ÷ 7.5 (clamped 1–5)</div></div>
-<div class="metric"><b>Prosody (expressiveness)</b> — how much the pitch varies. Flat speech sounds robotic; more variation is more expressive.<div class="formula">Prosody = standard deviation of pitch (Hz)</div></div>
-<div class="metric"><b>Robustness</b> — correctness (WER) measured only on hard sentences (numbers, currency, symbols, email). Lower is better.</div>
-<div class="metric"><b>STT latency (time-to-first-word)</b> — the audio is streamed to the provider's real-time API and we time the first word. This is the metric that matters for live voice agents. AssemblyAI runs in batch mode, so compare its accuracy, not its latency.</div>
+<div class="metric"><b>Time-to-first-audio (TTFA)</b>: how long from sending the text until the first audio is received, with the network round-trip subtracted so it reflects the provider's own speed.<div class="formula">TTFA = first-audio-byte time − network round-trip</div></div>
+<div class="metric"><b>Full generation time</b>: how long until the whole audio clip is produced.</div>
+<div class="metric"><b>Speed (RTF, Real-Time Factor)</b>: generation time divided by how long the audio plays. Below 1 is faster than real time; near 1 is slow for live use.<div class="formula">RTF = generation time ÷ audio duration</div></div>
+<div class="metric"><b>Correctness (WER)</b>: the generated audio is transcribed by a neutral speech recognizer (Deepgram) and compared to the input text. Lower is better.<div class="formula">WER = (substitutions + insertions + deletions) ÷ total words</div><span class="meta">Japanese uses CER (character error rate), since Japanese has no spaces between words.</span></div>
+<div class="metric"><b>Naturalness</b>: how clean and human the voice sounds, from the Harmonics-to-Noise Ratio (HNR) of the audio, mapped to a 1 to 5 score. Higher is better.<div class="formula">Naturalness = 1 + HNR ÷ 7.5 (clamped 1 to 5)</div></div>
+<div class="metric"><b>Prosody (expressiveness)</b>: how much the pitch varies. Flat speech sounds robotic; more variation is more expressive.<div class="formula">Prosody = standard deviation of pitch (Hz)</div></div>
+<div class="metric"><b>Robustness</b>: correctness (WER) measured only on hard sentences (numbers, currency, symbols, email). Lower is better.</div>
+<div class="metric"><b>STT latency (time-to-first-word)</b>: the audio is streamed to the provider's real-time API and we time the first word. This is the metric that matters for live voice agents. AssemblyAI runs in batch mode, so compare its accuracy, not its latency.</div>
 
 <h2>5. Audio samples (English)</h2>
-<p class="meta">Listen and judge quality yourself — same sentence for every provider.</p>
+<p class="meta">Listen and judge quality yourself: same sentence for every provider.</p>
 <div class='samp'><b>Atlas</b><audio controls src='samples/tts_Atlas_en_en_gen_1.wav'></audio></div><div class='samp'><b>ElevenLabs</b><audio controls src='samples/tts_ElevenLabs_en_en_gen_1.wav'></audio></div><div class='samp'><b>Cartesia</b><audio controls src='samples/tts_Cartesia_en_en_gen_1.wav'></audio></div><div class='samp'><b>Deepgram</b><audio controls src='samples/tts_Deepgram_en_en_gen_1.wav'></audio></div>
 
 <h2>6. Method</h2>

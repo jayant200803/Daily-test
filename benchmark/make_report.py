@@ -50,7 +50,7 @@ def best(d, key, lowest=True, exclude_none=True):
     return (min if lowest else max)(items, key=lambda x: x[1])[0]
 
 
-def fmt(v, suffix="", dash="—"):
+def fmt(v, suffix="", dash="-"):
     return (f"{v}{suffix}" if v is not None else dash)
 
 
@@ -86,7 +86,7 @@ def main():
                      + f"<td>{fmt(v['accuracy'],'%')}</td><td>{fmt(v['latency_ms'],' ms')}</td><td class='meta'>{v['mode']}</td></tr>")
         return f"<h3>{lang_label} ({list(d.values())[0]['metric'] if d else ''})</h3><table><tr>" + "".join(f"<th>{h}</th>" for h in head) + "</tr>" + rows + "</table>"
 
-    # radar data (English TTS) — 0-100, higher = better
+    # radar data (English TTS): 0-100, higher = better
     radar_labels = ["Accuracy", "Naturalness", "Prosody", "Speed", "Robustness"]
     radar = {}
     maxpros = max([v["prosody"] for v in tts_en.values() if v["prosody"]] or [1])
@@ -112,7 +112,7 @@ def main():
 
     page = f"""<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Voice AI Benchmark — Atlas vs the market</title>
+<title>Voice AI Benchmark: Atlas vs the market</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
  :root{{--bg:#0f1419;--card:#161c24;--fg:#e6edf3;--muted:#8b98a5;--line:#2b333d;--blue:#2f81f7;}}
@@ -141,11 +141,11 @@ def main():
 <p class="sub meta">Generated {data.get('generated_at_utc','')} · Providers: OneInbox Atlas, ElevenLabs, Cartesia, Deepgram, AssemblyAI</p>
 
 <div class="cards">
- <div class="c"><div class="lbl">Fastest TTS (Speed / RTF)</div><div class="val">{L_fast or '—'}</div><div class="note">lowest real-time factor</div></div>
- <div class="c"><div class="lbl">Most accurate TTS (WER)</div><div class="val">{L_acc or '—'}</div><div class="note">lowest word error rate</div></div>
- <div class="c"><div class="lbl">Most natural TTS</div><div class="val">{L_nat or '—'}</div><div class="note">highest harmonics-to-noise</div></div>
- <div class="c"><div class="lbl">Fastest STT (streaming)</div><div class="val">{L_stt_fast or '—'}</div><div class="note">lowest time-to-first-word</div></div>
- <div class="c"><div class="lbl">Most accurate STT</div><div class="val">{L_stt_acc or '—'}</div><div class="note">highest transcription accuracy</div></div>
+ <div class="c"><div class="lbl">Fastest TTS (Speed / RTF)</div><div class="val">{L_fast or '-'}</div><div class="note">lowest real-time factor</div></div>
+ <div class="c"><div class="lbl">Most accurate TTS (WER)</div><div class="val">{L_acc or '-'}</div><div class="note">lowest word error rate</div></div>
+ <div class="c"><div class="lbl">Most natural TTS</div><div class="val">{L_nat or '-'}</div><div class="note">highest harmonics-to-noise</div></div>
+ <div class="c"><div class="lbl">Fastest STT (streaming)</div><div class="val">{L_stt_fast or '-'}</div><div class="note">lowest time-to-first-word</div></div>
+ <div class="c"><div class="lbl">Most accurate STT</div><div class="val">{L_stt_acc or '-'}</div><div class="note">highest transcription accuracy</div></div>
 </div>
 
 <h2>1. Text-to-Speech leaderboard</h2>
@@ -158,20 +158,20 @@ def main():
 
 <h2>3. TTS metric comparison</h2>
 <div class="chartbox"><canvas id="radar"></canvas></div>
-<p class="meta">Radar values are scaled 0–100 where higher is better, for visual comparison only (English TTS).</p>
+<p class="meta">Radar values are scaled 0 to 100 where higher is better, for visual comparison only (English TTS).</p>
 
 <h2>4. How each number is measured</h2>
-<div class="metric"><b>Time-to-first-audio (TTFA)</b> — how long from sending the text until the first audio is received, with the network round-trip subtracted so it reflects the provider's own speed.<div class="formula">TTFA = first-audio-byte time − network round-trip</div></div>
-<div class="metric"><b>Full generation time</b> — how long until the whole audio clip is produced.</div>
-<div class="metric"><b>Speed (RTF, Real-Time Factor)</b> — generation time divided by how long the audio plays. Below 1 is faster than real time; near 1 is slow for live use.<div class="formula">RTF = generation time ÷ audio duration</div></div>
-<div class="metric"><b>Correctness (WER)</b> — the generated audio is transcribed by a neutral speech recognizer (Deepgram) and compared to the input text. Lower is better.<div class="formula">WER = (substitutions + insertions + deletions) ÷ total words</div><span class="meta">Japanese uses CER (character error rate), since Japanese has no spaces between words.</span></div>
-<div class="metric"><b>Naturalness</b> — how clean and human the voice sounds, from the Harmonics-to-Noise Ratio (HNR) of the audio, mapped to a 1–5 score. Higher is better.<div class="formula">Naturalness = 1 + HNR ÷ 7.5 (clamped 1–5)</div></div>
-<div class="metric"><b>Prosody (expressiveness)</b> — how much the pitch varies. Flat speech sounds robotic; more variation is more expressive.<div class="formula">Prosody = standard deviation of pitch (Hz)</div></div>
-<div class="metric"><b>Robustness</b> — correctness (WER) measured only on hard sentences (numbers, currency, symbols, email). Lower is better.</div>
-<div class="metric"><b>STT latency (time-to-first-word)</b> — the audio is streamed to the provider's real-time API and we time the first word. This is the metric that matters for live voice agents. AssemblyAI runs in batch mode, so compare its accuracy, not its latency.</div>
+<div class="metric"><b>Time-to-first-audio (TTFA)</b>: how long from sending the text until the first audio is received, with the network round-trip subtracted so it reflects the provider's own speed.<div class="formula">TTFA = first-audio-byte time − network round-trip</div></div>
+<div class="metric"><b>Full generation time</b>: how long until the whole audio clip is produced.</div>
+<div class="metric"><b>Speed (RTF, Real-Time Factor)</b>: generation time divided by how long the audio plays. Below 1 is faster than real time; near 1 is slow for live use.<div class="formula">RTF = generation time ÷ audio duration</div></div>
+<div class="metric"><b>Correctness (WER)</b>: the generated audio is transcribed by a neutral speech recognizer (Deepgram) and compared to the input text. Lower is better.<div class="formula">WER = (substitutions + insertions + deletions) ÷ total words</div><span class="meta">Japanese uses CER (character error rate), since Japanese has no spaces between words.</span></div>
+<div class="metric"><b>Naturalness</b>: how clean and human the voice sounds, from the Harmonics-to-Noise Ratio (HNR) of the audio, mapped to a 1 to 5 score. Higher is better.<div class="formula">Naturalness = 1 + HNR ÷ 7.5 (clamped 1 to 5)</div></div>
+<div class="metric"><b>Prosody (expressiveness)</b>: how much the pitch varies. Flat speech sounds robotic; more variation is more expressive.<div class="formula">Prosody = standard deviation of pitch (Hz)</div></div>
+<div class="metric"><b>Robustness</b>: correctness (WER) measured only on hard sentences (numbers, currency, symbols, email). Lower is better.</div>
+<div class="metric"><b>STT latency (time-to-first-word)</b>: the audio is streamed to the provider's real-time API and we time the first word. This is the metric that matters for live voice agents. AssemblyAI runs in batch mode, so compare its accuracy, not its latency.</div>
 
 <h2>5. Audio samples (English)</h2>
-<p class="meta">Listen and judge quality yourself — same sentence for every provider.</p>
+<p class="meta">Listen and judge quality yourself: same sentence for every provider.</p>
 {samples or '<p class="meta">(samples unavailable)</p>'}
 
 <h2>6. Method</h2>
