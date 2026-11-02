@@ -29,34 +29,34 @@
 
 <h1>Voice AI Benchmark 2026</h1>
 <p class="sub">A fair, measured comparison of speech-to-text (STT) and text-to-speech (TTS) providers.</p>
-<p class="sub meta">Latency measured 2026-11-02 06:16 UTC from the deployed app (next to the providers) · Quality analysed from the generated audio · Providers: OneInbox Atlas, ElevenLabs, Cartesia, Deepgram, AssemblyAI</p>
+<p class="sub meta">Latency measured 2026-11-02 06:33 UTC from the deployed app (next to the providers) · Quality analysed from the generated audio · Providers: OneInbox Atlas, ElevenLabs, Cartesia, Deepgram, AssemblyAI</p>
 
 <div class="cards">
  <div class="c"><div class="lbl">Most natural TTS</div><div class="val">Atlas</div><div class="note">highest harmonics-to-noise</div></div>
  <div class="c"><div class="lbl">Most accurate TTS</div><div class="val">Deepgram</div><div class="note">lowest word error rate</div></div>
- <div class="c"><div class="lbl">Fastest TTS first-audio</div><div class="val">ElevenLabs</div><div class="note">lowest time-to-first-audio</div></div>
+ <div class="c"><div class="lbl">Fastest TTS first-audio</div><div class="val">Deepgram</div><div class="note">lowest time-to-first-audio</div></div>
  <div class="c"><div class="lbl">Fastest streaming STT</div><div class="val">Atlas</div><div class="note">first word while you speak</div></div>
- <div class="c"><div class="lbl">Most accurate streaming STT</div><div class="val">Atlas</div><div class="note">highest accuracy, streaming</div></div>
+ <div class="c"><div class="lbl">Most accurate streaming STT</div><div class="val">Deepgram</div><div class="note">highest accuracy, streaming</div></div>
 </div>
 
 <h2>1. Text-to-Speech</h2>
-<h3>English</h3><table><tr><th>Provider</th><th>Time-to-first-audio ↓</th><th>Naturalness ↑</th><th>Prosody (Hz) ↑</th><th>Speed RTF ↓</th><th>Accuracy (WER ↓)</th><th>Robustness (hard WER) ↓</th></tr><tr><td class='p'>Atlas</td><td>761 ms</td><td>3.012</td><td>27.074</td><td>0.711</td><td>0.279</td><td>0.453</td></tr><tr><td class='p'>ElevenLabs</td><td>187 ms</td><td>2.244</td><td>46.59</td><td>0.267</td><td>0.206</td><td>0.386</td></tr><tr><td class='p'>Cartesia</td><td>204 ms</td><td>3.012</td><td>59.678</td><td>0.363</td><td>0.238</td><td>0.354</td></tr><tr><td class='p'>Deepgram</td><td>199 ms</td><td>2.561</td><td>80.764</td><td>0.594</td><td>0.189</td><td>0.388</td></tr></table>
-<h3>Japanese (Deepgram TTS is English-only)</h3><table><tr><th>Provider</th><th>Time-to-first-audio ↓</th><th>Naturalness ↑</th><th>Prosody (Hz) ↑</th><th>Speed RTF ↓</th><th>Accuracy (WER ↓)</th><th>Robustness (hard WER) ↓</th></tr><tr><td class='p'>Atlas</td><td>949 ms</td><td>2.868</td><td>39.99</td><td>0.754</td><td>0.199</td><td>0.335</td></tr><tr><td class='p'>ElevenLabs</td><td>203 ms</td><td>2.288</td><td>30.902</td><td>0.28</td><td>0.234</td><td>0.364</td></tr><tr><td class='p'>Cartesia</td><td>230 ms</td><td>2.554</td><td>30.454</td><td>0.324</td><td>0.193</td><td>0.335</td></tr></table>
+<h3>English</h3><table><tr><th>Provider</th><th>Time-to-first-audio ↓</th><th>Naturalness ↑</th><th>Prosody (Hz) ↑</th><th>Speed RTF ↓</th><th>Accuracy (WER ↓)</th><th>Robustness (hard WER) ↓</th></tr><tr><td class='p'>Atlas</td><td>667 ms</td><td>3.012</td><td>27.074</td><td>0.711</td><td>0.279</td><td>0.453</td></tr><tr><td class='p'>ElevenLabs</td><td>181 ms</td><td>2.244</td><td>46.59</td><td>0.267</td><td>0.206</td><td>0.386</td></tr><tr><td class='p'>Cartesia</td><td>229 ms</td><td>3.012</td><td>59.678</td><td>0.363</td><td>0.238</td><td>0.354</td></tr><tr><td class='p'>Deepgram</td><td>162 ms</td><td>2.561</td><td>80.764</td><td>0.594</td><td>0.189</td><td>0.388</td></tr></table>
+<h3>Japanese (Deepgram TTS is English-only)</h3><table><tr><th>Provider</th><th>Time-to-first-audio ↓</th><th>Naturalness ↑</th><th>Prosody (Hz) ↑</th><th>Speed RTF ↓</th><th>Accuracy (WER ↓)</th><th>Robustness (hard WER) ↓</th></tr><tr><td class='p'>Atlas</td><td>710 ms</td><td>2.868</td><td>39.99</td><td>0.754</td><td>0.199</td><td>0.335</td></tr><tr><td class='p'>ElevenLabs</td><td>205 ms</td><td>2.288</td><td>30.902</td><td>0.28</td><td>0.234</td><td>0.364</td></tr><tr><td class='p'>Cartesia</td><td>217 ms</td><td>2.554</td><td>30.454</td><td>0.324</td><td>0.193</td><td>0.335</td></tr></table>
 
 <h2>2. Speech-to-Text (grouped by type)</h2>
 <p class="meta">STT providers work in different ways. Comparing them in one list is misleading, so they are grouped by type and compared only within each group.</p>
 
 <div class="grp"><div class="tag">Streaming — returns words while you are still speaking (the metric for live voice agents)</div>
 <div class="exp">Latency = time to the first word. Lower is better.</div>
-<h4>English</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>86.8%</td><td>1174 ms</td></tr><tr><td class='p'>Deepgram</td><td>77.44%</td><td>1802 ms</td></tr></table><h4>Japanese</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>77.6%</td><td>1576 ms</td></tr><tr><td class='p'>Deepgram</td><td>74.26%</td><td>1680 ms</td></tr></table></div>
+<h4>English</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>75.56%</td><td>491 ms</td></tr><tr><td class='p'>Deepgram</td><td>77.44%</td><td>737 ms</td></tr></table><h4>Japanese</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>71.52%</td><td>577 ms</td></tr><tr><td class='p'>Deepgram</td><td>78.62%</td><td>758 ms</td></tr></table></div>
 
 <div class="grp"><div class="tag">Sync — send the whole clip, get the whole transcript back (waits until you finish speaking)</div>
 <div class="exp">Latency = time to transcribe a finished clip. Not usable mid-sentence in a live agent.</div>
-<h4>English</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>88.12%</td><td>2462 ms</td></tr><tr><td class='p'>ElevenLabs</td><td>86.96%</td><td>508 ms</td></tr><tr><td class='p'>Deepgram</td><td>82.48%</td><td>394 ms</td></tr></table><h4>Japanese</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>80.62%</td><td>2367 ms</td></tr><tr><td class='p'>ElevenLabs</td><td>86.78%</td><td>496 ms</td></tr><tr><td class='p'>Deepgram</td><td>78.3%</td><td>644 ms</td></tr></table></div>
+<h4>English</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>91.4%</td><td>2340 ms</td></tr><tr><td class='p'>ElevenLabs</td><td>93.075%</td><td>538 ms</td></tr><tr><td class='p'>Deepgram</td><td>87.475%</td><td>198 ms</td></tr></table><h4>Japanese</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>Atlas</td><td>82.44%</td><td>2495 ms</td></tr><tr><td class='p'>ElevenLabs</td><td>86.56%</td><td>568 ms</td></tr><tr><td class='p'>Deepgram</td><td>80.58%</td><td>395 ms</td></tr></table></div>
 
 <div class="grp"><div class="tag">Batch — upload and poll (offline transcription)</div>
 <div class="exp">Not real-time. Compare its accuracy, not its latency.</div>
-<h4>English</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>AssemblyAI</td><td>86.96%</td><td>2958 ms</td></tr></table><h4>Japanese</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>AssemblyAI</td><td>86.8%</td><td>3276 ms</td></tr></table></div>
+<h4>English</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>AssemblyAI</td><td>86.96%</td><td>2453 ms</td></tr></table><h4>Japanese</h4><table><tr><th>Provider</th><th>Accuracy ↑</th><th>Latency ↓</th></tr><tr><td class='p'>AssemblyAI</td><td>87.38%</td><td>3578 ms</td></tr></table></div>
 
 <h2>3. TTS quality comparison</h2>
 <div class="chartbox"><canvas id="radar"></canvas></div>

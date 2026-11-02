@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-11-02 06:16 UTC",
+  "generated_at_utc": "2026-11-02 06:33 UTC",
   "base": "https://daily-test-wine.vercel.app",
   "tts": [
     {
@@ -7,9 +7,9 @@
       "language": "en",
       "id": "en_gen_1",
       "category": "general",
-      "processing_ms": 839,
-      "first_byte_ms": 988,
-      "rtt_ms": 149,
+      "processing_ms": 661,
+      "first_byte_ms": 808,
+      "rtt_ms": 147,
       "status": 200
     },
     {
@@ -17,8 +17,8 @@
       "language": "en",
       "id": "en_gen_1",
       "category": "general",
-      "processing_ms": 217,
-      "first_byte_ms": 219,
+      "processing_ms": 189,
+      "first_byte_ms": 191,
       "rtt_ms": 2,
       "status": 200
     },
@@ -27,8 +27,8 @@
       "language": "en",
       "id": "en_gen_1",
       "category": "general",
-      "processing_ms": 179,
-      "first_byte_ms": 180,
+      "processing_ms": 180,
+      "first_byte_ms": 181,
       "rtt_ms": 1,
       "status": 200
     },
@@ -37,9 +37,9 @@
       "language": "en",
       "id": "en_gen_1",
       "category": "general",
-      "processing_ms": 154,
-      "first_byte_ms": 158,
-      "rtt_ms": 4,
+      "processing_ms": 57,
+      "first_byte_ms": 58,
+      "rtt_ms": 1,
       "status": 200
     },
     {
@@ -47,8 +47,8 @@
       "language": "en",
       "id": "en_gen_2",
       "category": "general",
-      "processing_ms": 888,
-      "first_byte_ms": 1035,
+      "processing_ms": 647,
+      "first_byte_ms": 794,
       "rtt_ms": 147,
       "status": 200
     },
@@ -57,8 +57,8 @@
       "language": "en",
       "id": "en_gen_2",
       "category": "general",
-      "processing_ms": 164,
-      "first_byte_ms": 166,
+      "processing_ms": 193,
+      "first_byte_ms": 195,
       "rtt_ms": 2,
       "status": 200
     },
@@ -67,8 +67,8 @@
       "language": "en",
       "id": "en_gen_2",
       "category": "general",
-      "processing_ms": 179,
-      "first_byte_ms": 180,
+      "processing_ms": 178,
+      "first_byte_ms": 179,
       "rtt_ms": 1,
       "status": 200
     },
@@ -77,49 +77,9 @@
       "language": "en",
       "id": "en_gen_2",
       "category": "general",
-      "processing_ms": 161,
-      "first_byte_ms": 225,
-      "rtt_ms": 64,
-      "status": 200
-    },
-    {
-      "provider": "Atlas",
-      "language": "en",
-      "id": "en_tec_1",
-      "category": "technical",
-      "processing_ms": 687,
-      "first_byte_ms": 834,
-      "rtt_ms": 147,
-      "status": 200
-    },
-    {
-      "provider": "ElevenLabs",
-      "language": "en",
-      "id": "en_tec_1",
-      "category": "technical",
-      "processing_ms": 176,
-      "first_byte_ms": 178,
-      "rtt_ms": 2,
-      "status": 200
-    },
-    {
-      "provider": "Cartesia",
-      "language": "en",
-      "id": "en_tec_1",
-      "category": "technical",
-      "processing_ms": 237,
-      "first_byte_ms": 238,
-      "rtt_ms": 1,
-      "status": 200
-    },
-    {
-      "provider": "Deepgram",
-      "language": "en",
-      "id": "en_tec_1",
-      "category": "technical",
-      "processing_ms": 157,
+      "processing_ms": 191,
       "first_byte_ms": 218,
-      "rtt_ms": 61,
+      "rtt_ms": 27,
       "status": 200
     },
     {
@@ -127,78 +87,78 @@
       "language": "en",
       "id": "en_hard_1",
       "category": "hard",
-      "processing_ms": 672,
-      "first_byte_ms": 820,
+      "processing_ms": 669,
+      "first_byte_ms": 815,
+      "rtt_ms": 146,
+      "status": 200
+    },
+    {
+      "provider": "ElevenLabs",
+      "language": "en",
+      "id": "en_hard_1",
+      "category": "hard",
+      "processing_ms": 174,
+      "first_byte_ms": 176,
+      "rtt_ms": 2,
+      "status": 200
+    },
+    {
+      "provider": "Cartesia",
+      "language": "en",
+      "id": "en_hard_1",
+      "category": "hard",
+      "processing_ms": 348,
+      "first_byte_ms": 349,
+      "rtt_ms": 1,
+      "status": 200
+    },
+    {
+      "provider": "Deepgram",
+      "language": "en",
+      "id": "en_hard_1",
+      "category": "hard",
+      "processing_ms": 234,
+      "first_byte_ms": 294,
+      "rtt_ms": 60,
+      "status": 200
+    },
+    {
+      "provider": "Atlas",
+      "language": "en",
+      "id": "en_hard_2",
+      "category": "hard",
+      "processing_ms": 690,
+      "first_byte_ms": 838,
       "rtt_ms": 148,
       "status": 200
     },
     {
       "provider": "ElevenLabs",
       "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "processing_ms": 185,
-      "first_byte_ms": 187,
-      "rtt_ms": 2,
-      "status": 200
-    },
-    {
-      "provider": "Cartesia",
-      "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "processing_ms": 223,
-      "first_byte_ms": 224,
-      "rtt_ms": 1,
-      "status": 200
-    },
-    {
-      "provider": "Deepgram",
-      "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "processing_ms": 353,
-      "first_byte_ms": 355,
-      "rtt_ms": 2,
-      "status": 200
-    },
-    {
-      "provider": "Atlas",
-      "language": "en",
-      "id": "en_hard_2",
-      "category": "hard",
-      "processing_ms": 718,
-      "first_byte_ms": 863,
-      "rtt_ms": 145,
-      "status": 200
-    },
-    {
-      "provider": "ElevenLabs",
-      "language": "en",
-      "id": "en_hard_2",
-      "category": "hard",
-      "processing_ms": 194,
-      "first_byte_ms": 195,
-      "rtt_ms": 1,
-      "status": 200
-    },
-    {
-      "provider": "Cartesia",
-      "language": "en",
-      "id": "en_hard_2",
-      "category": "hard",
-      "processing_ms": 201,
-      "first_byte_ms": 202,
-      "rtt_ms": 1,
-      "status": 200
-    },
-    {
-      "provider": "Deepgram",
-      "language": "en",
       "id": "en_hard_2",
       "category": "hard",
       "processing_ms": 168,
-      "first_byte_ms": 229,
+      "first_byte_ms": 170,
+      "rtt_ms": 2,
+      "status": 200
+    },
+    {
+      "provider": "Cartesia",
+      "language": "en",
+      "id": "en_hard_2",
+      "category": "hard",
+      "processing_ms": 209,
+      "first_byte_ms": 210,
+      "rtt_ms": 1,
+      "status": 200
+    },
+    {
+      "provider": "Deepgram",
+      "language": "en",
+      "id": "en_hard_2",
+      "category": "hard",
+      "processing_ms": 164,
+      "first_byte_ms": 225,
       "rtt_ms": 61,
       "status": 200
     },
@@ -207,9 +167,9 @@
       "language": "ja",
       "id": "ja_gen_1",
       "category": "general",
-      "processing_ms": 913,
-      "first_byte_ms": 1057,
-      "rtt_ms": 144,
+      "processing_ms": 845,
+      "first_byte_ms": 994,
+      "rtt_ms": 149,
       "status": 200
     },
     {
@@ -217,8 +177,8 @@
       "language": "ja",
       "id": "ja_gen_1",
       "category": "general",
-      "processing_ms": 208,
-      "first_byte_ms": 210,
+      "processing_ms": 206,
+      "first_byte_ms": 208,
       "rtt_ms": 2,
       "status": 200
     },
@@ -227,8 +187,8 @@
       "language": "ja",
       "id": "ja_gen_1",
       "category": "general",
-      "processing_ms": 337,
-      "first_byte_ms": 338,
+      "processing_ms": 184,
+      "first_byte_ms": 185,
       "rtt_ms": 1,
       "status": 200
     },
@@ -247,8 +207,8 @@
       "language": "ja",
       "id": "ja_gen_2",
       "category": "general",
-      "processing_ms": 1160,
-      "first_byte_ms": 1305,
+      "processing_ms": 667,
+      "first_byte_ms": 812,
       "rtt_ms": 145,
       "status": 200
     },
@@ -257,8 +217,8 @@
       "language": "ja",
       "id": "ja_gen_2",
       "category": "general",
-      "processing_ms": 196,
-      "first_byte_ms": 198,
+      "processing_ms": 194,
+      "first_byte_ms": 196,
       "rtt_ms": 2,
       "status": 200
     },
@@ -267,8 +227,8 @@
       "language": "ja",
       "id": "ja_gen_2",
       "category": "general",
-      "processing_ms": 243,
-      "first_byte_ms": 244,
+      "processing_ms": 313,
+      "first_byte_ms": 314,
       "rtt_ms": 1,
       "status": 200
     },
@@ -287,9 +247,9 @@
       "language": "ja",
       "id": "ja_tec_1",
       "category": "technical",
-      "processing_ms": 926,
-      "first_byte_ms": 1072,
-      "rtt_ms": 146,
+      "processing_ms": 647,
+      "first_byte_ms": 795,
+      "rtt_ms": 148,
       "status": 200
     },
     {
@@ -297,62 +257,62 @@
       "language": "ja",
       "id": "ja_tec_1",
       "category": "technical",
-      "processing_ms": 210,
-      "first_byte_ms": 212,
-      "rtt_ms": 2,
-      "status": 200
-    },
-    {
-      "provider": "Cartesia",
-      "language": "ja",
-      "id": "ja_tec_1",
-      "category": "technical",
-      "processing_ms": 190,
-      "first_byte_ms": 191,
-      "rtt_ms": 1,
-      "status": 200
-    },
-    {
-      "provider": "Deepgram",
-      "language": "ja",
-      "id": "ja_tec_1",
-      "category": "technical",
-      "processing_ms": null,
-      "first_byte_ms": null,
-      "rtt_ms": null,
-      "status": "N/A (English only)"
-    },
-    {
-      "provider": "Atlas",
-      "language": "ja",
-      "id": "ja_hard_1",
-      "category": "hard",
-      "processing_ms": 884,
-      "first_byte_ms": 1033,
-      "rtt_ms": 149,
-      "status": 200
-    },
-    {
-      "provider": "ElevenLabs",
-      "language": "ja",
-      "id": "ja_hard_1",
-      "category": "hard",
-      "processing_ms": 223,
-      "first_byte_ms": 225,
-      "rtt_ms": 2,
-      "status": 200
-    },
-    {
-      "provider": "Cartesia",
-      "language": "ja",
-      "id": "ja_hard_1",
-      "category": "hard",
       "processing_ms": 186,
       "first_byte_ms": 187,
       "rtt_ms": 1,
       "status": 200
     },
     {
+      "provider": "Cartesia",
+      "language": "ja",
+      "id": "ja_tec_1",
+      "category": "technical",
+      "processing_ms": 204,
+      "first_byte_ms": 206,
+      "rtt_ms": 2,
+      "status": 200
+    },
+    {
+      "provider": "Deepgram",
+      "language": "ja",
+      "id": "ja_tec_1",
+      "category": "technical",
+      "processing_ms": null,
+      "first_byte_ms": null,
+      "rtt_ms": null,
+      "status": "N/A (English only)"
+    },
+    {
+      "provider": "Atlas",
+      "language": "ja",
+      "id": "ja_hard_1",
+      "category": "hard",
+      "processing_ms": 709,
+      "first_byte_ms": 855,
+      "rtt_ms": 146,
+      "status": 200
+    },
+    {
+      "provider": "ElevenLabs",
+      "language": "ja",
+      "id": "ja_hard_1",
+      "category": "hard",
+      "processing_ms": 237,
+      "first_byte_ms": 239,
+      "rtt_ms": 2,
+      "status": 200
+    },
+    {
+      "provider": "Cartesia",
+      "language": "ja",
+      "id": "ja_hard_1",
+      "category": "hard",
+      "processing_ms": 192,
+      "first_byte_ms": 194,
+      "rtt_ms": 2,
+      "status": 200
+    },
+    {
       "provider": "Deepgram",
       "language": "ja",
       "id": "ja_hard_1",
@@ -367,9 +327,9 @@
       "language": "ja",
       "id": "ja_hard_2",
       "category": "hard",
-      "processing_ms": 860,
-      "first_byte_ms": 1010,
-      "rtt_ms": 150,
+      "processing_ms": 680,
+      "first_byte_ms": 825,
+      "rtt_ms": 145,
       "status": 200
     },
     {
@@ -377,8 +337,8 @@
       "language": "ja",
       "id": "ja_hard_2",
       "category": "hard",
-      "processing_ms": 177,
-      "first_byte_ms": 179,
+      "processing_ms": 202,
+      "first_byte_ms": 204,
       "rtt_ms": 2,
       "status": 200
     },
@@ -387,8 +347,8 @@
       "language": "ja",
       "id": "ja_hard_2",
       "category": "hard",
-      "processing_ms": 192,
-      "first_byte_ms": 193,
+      "processing_ms": 194,
+      "first_byte_ms": 195,
       "rtt_ms": 1,
       "status": 200
     },
@@ -412,7 +372,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 1047,
+      "latency_ms": 491,
       "mode": "streaming (time to first word)"
     },
     {
@@ -434,7 +394,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 1853,
+      "latency_ms": 742,
       "mode": "streaming (time to first word)"
     },
     {
@@ -445,7 +405,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 2173,
+      "latency_ms": 2136,
       "mode": "batch (upload+poll)"
     },
     {
@@ -456,7 +416,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial advisor.",
       "accuracy_pct": 100.0,
-      "latency_ms": 853,
+      "latency_ms": 439,
       "mode": "streaming (time to first word)"
     },
     {
@@ -467,7 +427,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial advisor",
       "accuracy_pct": 100.0,
-      "latency_ms": 365,
+      "latency_ms": 676,
       "mode": "sync"
     },
     {
@@ -478,7 +438,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "Would like to book a consultation with a financial adviser.",
       "accuracy_pct": 81.8,
-      "latency_ms": 1771,
+      "latency_ms": 738,
       "mode": "streaming (time to first word)"
     },
     {
@@ -489,7 +449,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial advisor.",
       "accuracy_pct": 100.0,
-      "latency_ms": 2079,
+      "latency_ms": 3571,
       "mode": "batch (upload+poll)"
     },
     {
@@ -500,7 +460,7 @@
       "reference": "Your policy number is 4821 and the premium is due on March third.",
       "transcript": "Your policy number is 4821, and the premium is due on March 3.",
       "accuracy_pct": 92.3,
-      "latency_ms": 1473,
+      "latency_ms": 486,
       "mode": "streaming (time to first word)"
     },
     {
@@ -509,9 +469,9 @@
       "id": "en_tec_1",
       "category": "technical",
       "reference": "Your policy number is 4821 and the premium is due on March third.",
-      "transcript": "Your policy number is 4821, and the premium is due on March 3rd",
+      "transcript": "Your policy number is 4821, and the premium is due on March 3rd.",
       "accuracy_pct": 92.3,
-      "latency_ms": 313,
+      "latency_ms": 343,
       "mode": "sync"
     },
     {
@@ -522,7 +482,7 @@
       "reference": "Your policy number is 4821 and the premium is due on March third.",
       "transcript": "Your policy number is four eight two one, and the premium is due on March third.",
       "accuracy_pct": 69.2,
-      "latency_ms": 1737,
+      "latency_ms": 749,
       "mode": "streaming (time to first word)"
     },
     {
@@ -533,7 +493,7 @@
       "reference": "Your policy number is 4821 and the premium is due on March third.",
       "transcript": "Your policy number is 4821, and the premium is due on March 3rd.",
       "accuracy_pct": 92.3,
-      "latency_ms": 3522,
+      "latency_ms": 2130,
       "mode": "batch (upload+poll)"
     },
     {
@@ -542,9 +502,9 @@
       "id": "en_hard_1",
       "category": "hard",
       "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
-      "transcript": "Please transfer $5,000 to account number 12-345, plus a 2.5% fee.",
-      "accuracy_pct": 75.0,
-      "latency_ms": 1043,
+      "transcript": "Please transfer $5,00",
+      "accuracy_pct": 18.8,
+      "latency_ms": 509,
       "mode": "streaming (time to first word)"
     },
     {
@@ -553,9 +513,9 @@
       "id": "en_hard_1",
       "category": "hard",
       "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
-      "transcript": "Please transfer $5,000 to account number 12345 plus a 2.5% fee.",
+      "transcript": "Please transfer $5,000 to account number 12345 plus a 2.5% fee",
       "accuracy_pct": 62.5,
-      "latency_ms": 462,
+      "latency_ms": 438,
       "mode": "sync"
     },
     {
@@ -566,7 +526,7 @@
       "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
       "transcript": "Please transfer five thousand dollars to account number twelve three four five plus a two point five percent fee.",
       "accuracy_pct": 56.2,
-      "latency_ms": 1883,
+      "latency_ms": 727,
       "mode": "streaming (time to first word)"
     },
     {
@@ -577,7 +537,7 @@
       "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
       "transcript": "Please transfer $5,000 to account number 12345 plus a 2.5% fee.",
       "accuracy_pct": 62.5,
-      "latency_ms": 3524,
+      "latency_ms": 2229,
       "mode": "batch (upload+poll)"
     },
     {
@@ -588,7 +548,7 @@
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
       "transcript": "Email the report to jon.doh@example.com before 11:59 PM.",
       "accuracy_pct": 66.7,
-      "latency_ms": 1452,
+      "latency_ms": 532,
       "mode": "streaming (time to first word)"
     },
     {
@@ -597,9 +557,9 @@
       "id": "en_hard_2",
       "category": "hard",
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
-      "transcript": "Email the report to john.doe@example.com before 11:59 PM.",
+      "transcript": "Email the report to john.doe@example.com before 11:59 PM",
       "accuracy_pct": 80.0,
-      "latency_ms": 474,
+      "latency_ms": 531,
       "mode": "sync"
     },
     {
@@ -610,7 +570,7 @@
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
       "transcript": "Email the report to John dot Doe at Example dot com before eleven fifty nine PM.",
       "accuracy_pct": 80.0,
-      "latency_ms": 1765,
+      "latency_ms": 730,
       "mode": "streaming (time to first word)"
     },
     {
@@ -621,7 +581,7 @@
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
       "transcript": "Email the report to john.doe@example.com before 11:59 PM.",
       "accuracy_pct": 80.0,
-      "latency_ms": 3492,
+      "latency_ms": 2198,
       "mode": "batch (upload+poll)"
     },
     {
@@ -632,7 +592,7 @@
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "transcript": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "accuracy_pct": 100.0,
-      "latency_ms": 1451,
+      "latency_ms": 539,
       "mode": "streaming (time to first word)"
     },
     {
@@ -643,7 +603,7 @@
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "transcript": "お電話ありがとうございます。本日はどのようなご用件でしょうか？",
       "accuracy_pct": 100.0,
-      "latency_ms": 447,
+      "latency_ms": 473,
       "mode": "sync"
     },
     {
@@ -652,9 +612,9 @@
       "id": "ja_gen_1",
       "category": "general",
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
-      "transcript": "電話ありがとうございます。 本日はどのようなご用件でしょうか。",
-      "accuracy_pct": 96.6,
-      "latency_ms": 1881,
+      "transcript": "電話ありがとうございます。 本日はどのようなご要件でしょうか。",
+      "accuracy_pct": 93.1,
+      "latency_ms": 729,
       "mode": "streaming (time to first word)"
     },
     {
@@ -665,7 +625,7 @@
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "transcript": "お電話ありがとうございます。本日はどのようなご要件でしょうか。",
       "accuracy_pct": 96.6,
-      "latency_ms": 3637,
+      "latency_ms": 3556,
       "mode": "batch (upload+poll)"
     },
     {
@@ -676,7 +636,7 @@
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "transcript": "ファイナンシャル・アドバイザーとの相談を予約したいです。",
       "accuracy_pct": 96.2,
-      "latency_ms": 1652,
+      "latency_ms": 583,
       "mode": "streaming (time to first word)"
     },
     {
@@ -687,7 +647,7 @@
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "transcript": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "accuracy_pct": 100.0,
-      "latency_ms": 376,
+      "latency_ms": 619,
       "mode": "sync"
     },
     {
@@ -698,7 +658,7 @@
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "transcript": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "accuracy_pct": 100.0,
-      "latency_ms": 1692,
+      "latency_ms": 786,
       "mode": "streaming (time to first word)"
     },
     {
@@ -709,7 +669,7 @@
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "transcript": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "accuracy_pct": 100.0,
-      "latency_ms": 2148,
+      "latency_ms": 3536,
       "mode": "batch (upload+poll)"
     },
     {
@@ -718,42 +678,42 @@
       "id": "ja_tec_1",
       "category": "technical",
       "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号は私発の基盤で、保険料の支払いは三下三下です。",
-      "accuracy_pct": 74.1,
-      "latency_ms": 1467,
-      "mode": "streaming (time to first word)"
-    },
-    {
-      "provider": "ElevenLabs",
-      "language": "ja",
-      "id": "ja_tec_1",
-      "category": "technical",
-      "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号は私発に基盤で、保険料の支払いは3月3日です。",
-      "accuracy_pct": 74.1,
-      "latency_ms": 472,
-      "mode": "sync"
-    },
-    {
-      "provider": "Deepgram",
-      "language": "ja",
-      "id": "ja_tec_1",
-      "category": "technical",
-      "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号は私初にある基盤で 保険料の支払いは懺悔賛太です。",
-      "accuracy_pct": 59.3,
-      "latency_ms": 1815,
-      "mode": "streaming (time to first word)"
-    },
-    {
-      "provider": "AssemblyAI",
-      "language": "ja",
-      "id": "ja_tec_1",
-      "category": "technical",
-      "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号は私初ニア基盤で保険料の支払いは三月三日です。",
+      "transcript": "保険証券番号は私発に1番で、保険料の支払いは3月3日です。",
       "accuracy_pct": 77.8,
-      "latency_ms": 3533,
+      "latency_ms": 541,
+      "mode": "streaming (time to first word)"
+    },
+    {
+      "provider": "ElevenLabs",
+      "language": "ja",
+      "id": "ja_tec_1",
+      "category": "technical",
+      "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
+      "transcript": "保険証券番号は私発に一番で、保険料の支払いは3月3日です。",
+      "accuracy_pct": 81.5,
+      "latency_ms": 597,
+      "mode": "sync"
+    },
+    {
+      "provider": "Deepgram",
+      "language": "ja",
+      "id": "ja_tec_1",
+      "category": "technical",
+      "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
+      "transcript": "保険証券番号は私初にに一番で 保険料の支払いはサンゲツ三理以下です。",
+      "accuracy_pct": 59.3,
+      "latency_ms": 767,
+      "mode": "streaming (time to first word)"
+    },
+    {
+      "provider": "AssemblyAI",
+      "language": "ja",
+      "id": "ja_tec_1",
+      "category": "technical",
+      "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
+      "transcript": "保険証券番号は私発人に一番で、保険料の支払いは三月三日です。",
+      "accuracy_pct": 85.2,
+      "latency_ms": 3569,
       "mode": "batch (upload+poll)"
     },
     {
@@ -762,9 +722,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "講座、えー、番号じわりのサンシエバーに5,000ドルを送金し、2.5%の手数料を加えてください。",
-      "accuracy_pct": 38.5,
-      "latency_ms": 1657,
+      "transcript": "口座番号ありの",
+      "accuracy_pct": 12.8,
+      "latency_ms": 632,
       "mode": "streaming (time to first word)"
     },
     {
@@ -773,9 +733,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "口座、えー、番号二割の三四番に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "accuracy_pct": 87.2,
-      "latency_ms": 953,
+      "transcript": "コース30番号付き割の3島に5,000ドルを送金し、2.5%の手数料を加えてください。",
+      "accuracy_pct": 41.0,
+      "latency_ms": 1104,
       "mode": "sync"
     },
     {
@@ -784,9 +744,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "講座 番号字割のサンシーバーに午前ドルを送金し 二点部の貯水量を加えてください。",
-      "accuracy_pct": 48.7,
-      "latency_ms": 1328,
+      "transcript": "交差値番号視野ありの 三シーマニ御前ドルを送金し 二伝部パーセントの手数料を加えてください。",
+      "accuracy_pct": 61.5,
+      "latency_ms": 746,
       "mode": "streaming (time to first word)"
     },
     {
@@ -795,9 +755,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "口座番号縛りの三シーバーに五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "accuracy_pct": 84.6,
-      "latency_ms": 3559,
+      "transcript": "コーザーチ番号仕割りの三シーマに五千ドルを送金し、二点五パーセントの手数料を加えてください。",
+      "accuracy_pct": 71.8,
+      "latency_ms": 3576,
       "mode": "batch (upload+poll)"
     },
     {
@@ -806,20 +766,20 @@
       "id": "ja_hard_2",
       "category": "hard",
       "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後10時19分までに送ってください。",
+      "transcript": "レポートを午後4:19までに送ってください。",
+      "accuracy_pct": 70.8,
+      "latency_ms": 589,
+      "mode": "streaming (time to first word)"
+    },
+    {
+      "provider": "ElevenLabs",
+      "language": "ja",
+      "id": "ja_hard_2",
+      "category": "hard",
+      "reference": "レポートを午後十一時五十九分までに送ってください。",
+      "transcript": "レポートを午後4時19分までに送ってください。",
       "accuracy_pct": 79.2,
-      "latency_ms": 1654,
-      "mode": "streaming (time to first word)"
-    },
-    {
-      "provider": "ElevenLabs",
-      "language": "ja",
-      "id": "ja_hard_2",
-      "category": "hard",
-      "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後時議事虫9分までに送ってください。",
-      "accuracy_pct": 75.0,
-      "latency_ms": 994,
+      "latency_ms": 410,
       "mode": "sync"
     },
     {
@@ -828,9 +788,9 @@
       "id": "ja_hard_2",
       "category": "hard",
       "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後時議事務事務事務までに送ってください。",
-      "accuracy_pct": 66.7,
-      "latency_ms": 1686,
+      "transcript": "レポートを午後、市議一無二九分までに送ってください。",
+      "accuracy_pct": 79.2,
+      "latency_ms": 762,
       "mode": "streaming (time to first word)"
     },
     {
@@ -839,9 +799,9 @@
       "id": "ja_hard_2",
       "category": "hard",
       "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後時議事務時9分までに送ってください。",
-      "accuracy_pct": 75.0,
-      "latency_ms": 3504,
+      "transcript": "レポートを午後四時一時無事九分までに送ってください。",
+      "accuracy_pct": 83.3,
+      "latency_ms": 3654,
       "mode": "batch (upload+poll)"
     }
   ],
@@ -854,7 +814,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 2377,
+      "latency_ms": 2324,
       "mode": "sync"
     },
     {
@@ -865,7 +825,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 383,
+      "latency_ms": 440,
       "mode": "sync"
     },
     {
@@ -876,7 +836,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 307,
+      "latency_ms": 61,
       "mode": "sync"
     },
     {
@@ -887,7 +847,7 @@
       "reference": "Thank you for calling Manulife Finance. How may I help you today?",
       "transcript": "Thank you for calling Manulife Finance. How may I help you today?",
       "accuracy_pct": 100.0,
-      "latency_ms": 1999,
+      "latency_ms": 2029,
       "mode": "batch (upload+poll)"
     },
     {
@@ -898,7 +858,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial advisor.",
       "accuracy_pct": 100.0,
-      "latency_ms": 2111,
+      "latency_ms": 2190,
       "mode": "sync"
     },
     {
@@ -909,7 +869,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial advisor",
       "accuracy_pct": 100.0,
-      "latency_ms": 694,
+      "latency_ms": 361,
       "mode": "sync"
     },
     {
@@ -920,7 +880,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial adviser.",
       "accuracy_pct": 90.9,
-      "latency_ms": 341,
+      "latency_ms": 64,
       "mode": "sync"
     },
     {
@@ -931,7 +891,7 @@
       "reference": "I would like to book a consultation with a financial advisor.",
       "transcript": "I would like to book a consultation with a financial advisor.",
       "accuracy_pct": 100.0,
-      "latency_ms": 2057,
+      "latency_ms": 2040,
       "mode": "batch (upload+poll)"
     },
     {
@@ -942,7 +902,7 @@
       "reference": "Your policy number is 4821 and the premium is due on March third.",
       "transcript": "Your policy number is 4821, and the premium is due on March 3.",
       "accuracy_pct": 92.3,
-      "latency_ms": 2420,
+      "latency_ms": 1918,
       "mode": "sync"
     },
     {
@@ -951,9 +911,9 @@
       "id": "en_tec_1",
       "category": "technical",
       "reference": "Your policy number is 4821 and the premium is due on March third.",
-      "transcript": "Your policy number is 4821 and the premium is due on March 3rd.",
+      "transcript": "Your policy number is 4821, and the premium is due on March 3rd.",
       "accuracy_pct": 92.3,
-      "latency_ms": 510,
+      "latency_ms": 444,
       "mode": "sync"
     },
     {
@@ -964,7 +924,7 @@
       "reference": "Your policy number is 4821 and the premium is due on March third.",
       "transcript": "Your policy number is 4821, and the premium is due on March 3.",
       "accuracy_pct": 92.3,
-      "latency_ms": 352,
+      "latency_ms": 81,
       "mode": "sync"
     },
     {
@@ -975,51 +935,7 @@
       "reference": "Your policy number is 4821 and the premium is due on March third.",
       "transcript": "Your policy number is 4821, and the premium is due on March 3rd.",
       "accuracy_pct": 92.3,
-      "latency_ms": 3469,
-      "mode": "batch (upload+poll)"
-    },
-    {
-      "provider": "Atlas",
-      "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
-      "transcript": "Please transfer $5,000 to account number 12-345, plus a 2.5% fee.",
-      "accuracy_pct": 75.0,
-      "latency_ms": 3313,
-      "mode": "sync"
-    },
-    {
-      "provider": "ElevenLabs",
-      "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
-      "transcript": "Please transfer $5,000 to account number 12345 plus a 2.5% fee.",
-      "accuracy_pct": 62.5,
-      "latency_ms": 393,
-      "mode": "sync"
-    },
-    {
-      "provider": "Deepgram",
-      "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
-      "transcript": "Please transfer $5,000 to account number 12345 plus a 2.5% fee.",
-      "accuracy_pct": 62.5,
-      "latency_ms": 514,
-      "mode": "sync"
-    },
-    {
-      "provider": "AssemblyAI",
-      "language": "en",
-      "id": "en_hard_1",
-      "category": "hard",
-      "reference": "Please transfer five thousand dollars to account number 12 345 plus a 2.5 percent fee.",
-      "transcript": "Please transfer $5,000 to account number 12345 plus a 2.5% fee.",
-      "accuracy_pct": 62.5,
-      "latency_ms": 2136,
+      "latency_ms": 2135,
       "mode": "batch (upload+poll)"
     },
     {
@@ -1030,7 +946,7 @@
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
       "transcript": "Email the report to jon.doe@example.com before 11:59 PM.",
       "accuracy_pct": 73.3,
-      "latency_ms": 2087,
+      "latency_ms": 2926,
       "mode": "sync"
     },
     {
@@ -1039,9 +955,9 @@
       "id": "en_hard_2",
       "category": "hard",
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
-      "transcript": "Email the report to john.doe@example.com before 11:59 PM",
+      "transcript": "Email the report to john.doe@example.com before 11:59 PM.",
       "accuracy_pct": 80.0,
-      "latency_ms": 561,
+      "latency_ms": 905,
       "mode": "sync"
     },
     {
@@ -1052,7 +968,7 @@
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
       "transcript": "Email the report to John.Doe@Example.com before 11:59PM.",
       "accuracy_pct": 66.7,
-      "latency_ms": 456,
+      "latency_ms": 585,
       "mode": "sync"
     },
     {
@@ -1063,7 +979,7 @@
       "reference": "Email the report to john dot doe at example dot com before 11:59 PM.",
       "transcript": "Email the report to john.doe@example.com before 11:59 PM.",
       "accuracy_pct": 80.0,
-      "latency_ms": 2089,
+      "latency_ms": 2111,
       "mode": "batch (upload+poll)"
     },
     {
@@ -1074,7 +990,7 @@
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "transcript": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "accuracy_pct": 100.0,
-      "latency_ms": 2931,
+      "latency_ms": 2168,
       "mode": "sync"
     },
     {
@@ -1085,7 +1001,7 @@
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "transcript": "お電話ありがとうございます。本日はどのようなご用件でしょうか？",
       "accuracy_pct": 100.0,
-      "latency_ms": 383,
+      "latency_ms": 401,
       "mode": "sync"
     },
     {
@@ -1094,9 +1010,9 @@
       "id": "ja_gen_1",
       "category": "general",
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
-      "transcript": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
-      "accuracy_pct": 100.0,
-      "latency_ms": 263,
+      "transcript": "電話ありがとうございます。本日はどのようなご用件でしょうか",
+      "accuracy_pct": 96.6,
+      "latency_ms": 103,
       "mode": "sync"
     },
     {
@@ -1107,7 +1023,7 @@
       "reference": "お電話ありがとうございます。本日はどのようなご用件でしょうか。",
       "transcript": "お電話ありがとうございます。本日はどのようなご要件でしょうか。",
       "accuracy_pct": 96.6,
-      "latency_ms": 2041,
+      "latency_ms": 2066,
       "mode": "batch (upload+poll)"
     },
     {
@@ -1116,9 +1032,9 @@
       "id": "ja_gen_2",
       "category": "general",
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
-      "transcript": "ファイナンシャル・アドバイザーの相談を予約したいです。",
-      "accuracy_pct": 92.3,
-      "latency_ms": 2234,
+      "transcript": "ファイナンシャル・アドバイザーとの相談を予約したいです。",
+      "accuracy_pct": 96.2,
+      "latency_ms": 2276,
       "mode": "sync"
     },
     {
@@ -1129,7 +1045,7 @@
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "transcript": "ファイナンシャルアドバイザーとの相談を予約したいです。",
       "accuracy_pct": 100.0,
-      "latency_ms": 370,
+      "latency_ms": 371,
       "mode": "sync"
     },
     {
@@ -1138,9 +1054,9 @@
       "id": "ja_gen_2",
       "category": "general",
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
-      "transcript": "ファイナンシャルアドバイザーの相談を予約したいです",
-      "accuracy_pct": 96.2,
-      "latency_ms": 636,
+      "transcript": "ファイナンシャルアドバイザーとの相談を予約したいです。",
+      "accuracy_pct": 100.0,
+      "latency_ms": 483,
       "mode": "sync"
     },
     {
@@ -1149,9 +1065,9 @@
       "id": "ja_gen_2",
       "category": "general",
       "reference": "ファイナンシャルアドバイザーとの相談を予約したいです。",
-      "transcript": "ファイナンシャルアドバイザーの相談を予約したいです。",
+      "transcript": "ファイナンシャルアドバイザーズとの相談を予約したいです。",
       "accuracy_pct": 96.2,
-      "latency_ms": 3501,
+      "latency_ms": 2026,
       "mode": "batch (upload+poll)"
     },
     {
@@ -1160,9 +1076,9 @@
       "id": "ja_tec_1",
       "category": "technical",
       "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号は私発21番で、保険料の支払いは3月3日です。",
+      "transcript": "保険証券番号は私発E番で、保険料の支払いは3月3日です。",
       "accuracy_pct": 77.8,
-      "latency_ms": 2019,
+      "latency_ms": 3068,
       "mode": "sync"
     },
     {
@@ -1171,9 +1087,9 @@
       "id": "ja_tec_1",
       "category": "technical",
       "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号は私発に八番で、保険料の支払いは3月3日です。",
-      "accuracy_pct": 77.8,
-      "latency_ms": 515,
+      "transcript": "保険証券番号は私発イイ番で、保険料の支払いは3月締めです。",
+      "accuracy_pct": 74.1,
+      "latency_ms": 595,
       "mode": "sync"
     },
     {
@@ -1182,9 +1098,9 @@
       "id": "ja_tec_1",
       "category": "technical",
       "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号、ワヌ渡し初に8番で、保険料の支払いは3月3次です。",
-      "accuracy_pct": 63.0,
-      "latency_ms": 666,
+      "transcript": "保険証券番号は、私初位以外で、保険料の支払いは3月真我です。",
+      "accuracy_pct": 70.4,
+      "latency_ms": 1013,
       "mode": "sync"
     },
     {
@@ -1193,9 +1109,9 @@
       "id": "ja_tec_1",
       "category": "technical",
       "reference": "保険証券番号は四八二一番で、保険料の支払いは三月三日です。",
-      "transcript": "保険証券番号ある私初に八番で保険料の支払いは三月三日です。",
-      "accuracy_pct": 77.8,
-      "latency_ms": 3505,
+      "transcript": "保険証券番号は私発言イバンで保険料の支払いは三月新賀です。",
+      "accuracy_pct": 70.4,
+      "latency_ms": 3482,
       "mode": "batch (upload+poll)"
     },
     {
@@ -1204,9 +1120,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "口座番号締まりの3C話に5,000ドルを送金し、2.5%の手数料を加えてください。",
-      "accuracy_pct": 53.8,
-      "latency_ms": 2531,
+      "transcript": "口座番号ありの三島に5000ドルを送金し、2.5%の手数料を加えてください。",
+      "accuracy_pct": 59.0,
+      "latency_ms": 2345,
       "mode": "sync"
     },
     {
@@ -1215,9 +1131,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "口座番号締まりの三四輪に5,000ドルを送金し、二点部パーセントの手数料を加えてください。",
-      "accuracy_pct": 76.9,
-      "latency_ms": 785,
+      "transcript": "口座番号四割の三子山に5,000ドルを送金し、二点五パーセントの手数料を加えてください。",
+      "accuracy_pct": 79.5,
+      "latency_ms": 987,
       "mode": "sync"
     },
     {
@@ -1226,9 +1142,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "交差番号締まりの3c和に5000ドルを送金し、遺伝部パーセントの手数料を加えてください。",
-      "accuracy_pct": 61.5,
-      "latency_ms": 117,
+      "transcript": "公差番号支有の3支山に午前ドルを送金し、2天部パーセントの手数料を加えてください。",
+      "accuracy_pct": 69.2,
+      "latency_ms": 121,
       "mode": "sync"
     },
     {
@@ -1237,9 +1153,9 @@
       "id": "ja_hard_1",
       "category": "hard",
       "reference": "口座番号十二の三四五に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
-      "transcript": "交差番号締まりの三四話に五千ドルを送金し、遺伝部パーセントの手数料を加えてください。",
+      "transcript": "コーサー番号支払いの三島に五千ドルを送金し、二点五パーセントの手数料を加えてください。",
       "accuracy_pct": 76.9,
-      "latency_ms": 3531,
+      "latency_ms": 3516,
       "mode": "batch (upload+poll)"
     },
     {
@@ -1248,9 +1164,9 @@
       "id": "ja_hard_2",
       "category": "hard",
       "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後11時59分までに送ってください。",
+      "transcript": "レポートを午後11時19分までに送ってください。",
       "accuracy_pct": 79.2,
-      "latency_ms": 2122,
+      "latency_ms": 2616,
       "mode": "sync"
     },
     {
@@ -1261,7 +1177,7 @@
       "reference": "レポートを午後十一時五十九分までに送ってください。",
       "transcript": "レポートを午後7時59分までに送ってください。",
       "accuracy_pct": 79.2,
-      "latency_ms": 427,
+      "latency_ms": 485,
       "mode": "sync"
     },
     {
@@ -1270,9 +1186,9 @@
       "id": "ja_hard_2",
       "category": "hard",
       "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後sim、一時期、無事9分までに送ってください",
-      "accuracy_pct": 70.8,
-      "latency_ms": 1539,
+      "transcript": "レポートを午後、地域秩父支部市9分までに送ってください。",
+      "accuracy_pct": 66.7,
+      "latency_ms": 253,
       "mode": "sync"
     },
     {
@@ -1281,9 +1197,9 @@
       "id": "ja_hard_2",
       "category": "hard",
       "reference": "レポートを午後十一時五十九分までに送ってください。",
-      "transcript": "レポートを午後渋い時期無事9分までに送ってください。",
+      "transcript": "レポートを午後、地議支部支9分までに送ってください。",
       "accuracy_pct": 75.0,
-      "latency_ms": 3409,
+      "latency_ms": 3426,
       "mode": "batch (upload+poll)"
     }
   ]
