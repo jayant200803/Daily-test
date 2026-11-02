@@ -501,8 +501,9 @@ async function finalizeTurn() {
   logLine('turn captured (you stopped speaking)');
   pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
-    // full conversation (incl. this turn) so the model remembers context
-    const history = convo.map(o => ({ role: o.role==='atlas' ? 'assistant' : 'user', content: o.text }));
+    // recent conversation (last 8 turns) so the model remembers context WITHOUT sending the
+    // whole transcript every turn — fewer tokens = far less chance of hitting the LLM rate limit.
+    const history = convo.slice(-8).map(o => ({ role: o.role==='atlas' ? 'assistant' : 'user', content: o.text }));
     // 1) LLM only (fast) — 20s safety timeout
     logLine('LLM request sent');
     const r=await fetch('/api/respond',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -543,7 +544,8 @@ async function finalizeTurn() {
     entry.lat={ttft, ttfa}; render();
     logLine('TTS streaming (TTFA '+(ttfa!=null?ttfa+' ms':'?')+', mode '+(window.__mseUsed?'MediaSource':'buffered')+')');
   } catch(e){
-    const msg = (e && (e.name==='TimeoutError'||e.name==='AbortError')) ? 'Timed out — Atlas was slow. Please try again.' : (e && e.message) || 'error';
+    const msg = (e && (e.name==='TimeoutError'||e.name==='AbortError')) ? 'Timed out (the assistant was slow — often the free LLM rate limit). Please try again.' : (e && e.message) || 'error';
+    logLine('TURN ERROR: '+msg);   // make the failure visible in the log instead of silent dead air
     pReply.innerHTML='<span class="err">'+esc(msg)+'</span>'; resumeListening();
   }
 }
