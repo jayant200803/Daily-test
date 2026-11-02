@@ -498,6 +498,7 @@ async function finalizeTurn() {
   tStart=performance.now();              // reliable wall-clock: turn captured -> reply ready
   convo.push({role:'you', text}); render();
   logLine('── TURN ── you: "'+text+'"');
+  logLine('STT first word (TTFP '+(uTTFP!=null?uTTFP+' ms':'?')+', measured live while you spoke)');
   logLine('turn captured (you stopped speaking)');
   pStatus.innerHTML='<span class="dot"></span>thinking…';
   try {
