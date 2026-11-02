@@ -68,9 +68,12 @@ def run_stt():
             if not wav:
                 print(f"  (clip gen failed {sid})"); continue
             for name in P.STT_PROVIDERS:
+                raw = rtt = None
                 if name in STREAMING_STT:
                     r = S.streaming_ttfp(name, wav, lang)
-                    txt, lat, mode = r.get("transcript") or "", r.get("ttfp_ms"), "streaming (time to first word)"
+                    txt, lat = r.get("transcript") or "", r.get("ttfp_ms")
+                    raw, rtt = r.get("ttfp_raw_ms"), r.get("rtt_ms")
+                    mode = "streaming first word (speech-start zero, network removed)"
                 else:
                     try: rr = P.STT_PROVIDERS[name](wav, lang)
                     except Exception as e: rr = {"text": "", "latency_ms": None, "mode": f"exc:{e}"}
@@ -78,7 +81,8 @@ def run_stt():
                 score = P.cer(text, txt) if lang == "ja" else P.wer(text, txt)
                 rows.append({"provider": name, "language": lang, "id": sid, "category": cat, "reference": text,
                              "transcript": txt, "wer": round(score, 3), "accuracy_pct": round((1 - score) * 100, 1),
-                             "metric": ("CER" if lang == "ja" else "WER"), "latency_ms": lat, "mode": mode})
+                             "metric": ("CER" if lang == "ja" else "WER"), "latency_ms": lat,
+                             "latency_raw_ms": raw, "rtt_ms": rtt, "mode": mode})
                 print(f"  STT {name:11} {lang} {sid:10} acc={rows[-1]['accuracy_pct']}% {lat}ms [{mode}]")
     return rows
 
