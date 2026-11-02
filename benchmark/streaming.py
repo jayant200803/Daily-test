@@ -65,13 +65,11 @@ async def _atlas(pcm, rate, lang):
     first_word_wall = None; speech_start_wall = None; parts = []
     ws = await _connect(url, {"Authorization": f"Bearer {key}"})
     try:
-        # server_vad on -> Atlas reports audio_start_ms (when speech actually begins), so we zero
-        # the clock at speech start and subtract the lead-in silence, exactly like the live call
-        # (the stream is open and warmed up before the caller speaks). interim:True streams partials.
+        # interim:True streams partial hypotheses immediately -> first word comes back fast.
+        # Clock zeroes at the first chunk sent (clips have no lead-in), network removed afterwards.
         await ws.send(json.dumps({"type": "session.update", "session": {"type": "transcription",
             "audio": {"input": {"format": {"type": "audio/pcm", "rate": rate},
-            "transcription": {"model": "atlas-listen", "language": lang},
-            "turn_detection": {"type": "server_vad", "silence_duration_ms": 900}}},
+            "transcription": {"model": "atlas-listen", "language": lang}}},
             "atlas": {"interim": True}}}))
         step = rate * 2 // 10   # 0.2s of 16-bit mono audio per chunk
         t0 = time.time()
