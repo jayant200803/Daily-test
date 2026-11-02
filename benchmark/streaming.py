@@ -65,13 +65,12 @@ async def _atlas(pcm, rate, lang):
     first_word_wall = None; speech_start_wall = None; parts = []
     ws = await _connect(url, {"Authorization": f"Bearer {key}"})
     try:
-        # server_vad on -> Atlas emits speech_started with audio_start_ms, so we can zero the
-        # clock at the moment speech actually begins (skipping lead-in silence), exactly like
-        # the live speech-to-speech pipeline does.
+        # interim:True with NO server VAD -> Atlas streams partial hypotheses immediately, so the
+        # first word comes back fast. This mirrors the live speech-to-speech demo exactly (that
+        # path does not use VAD). VAD was found to DELAY the first word, so it is intentionally off.
         await ws.send(json.dumps({"type": "session.update", "session": {"type": "transcription",
             "audio": {"input": {"format": {"type": "audio/pcm", "rate": rate},
-            "transcription": {"model": "atlas-listen", "language": lang},
-            "turn_detection": {"type": "server_vad", "silence_duration_ms": 900}}},
+            "transcription": {"model": "atlas-listen", "language": lang}}},
             "atlas": {"interim": True}}}))
         step = rate * 2 // 10   # 0.2s of 16-bit mono audio per chunk
         t0 = time.time()
